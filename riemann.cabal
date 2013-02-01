@@ -55,7 +55,7 @@ test-suite property
   main-is:         Property.hs
   build-depends: 
     base,
-    QuickCheck,
+    QuickCheck >= 2.5.1.0,
     test-framework,
     test-framework-quickcheck2,
     riemann
