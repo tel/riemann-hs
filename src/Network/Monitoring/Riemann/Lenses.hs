@@ -41,8 +41,8 @@ import Data.Monoid
 import Data.Maybe
 import Data.Foldable
 import qualified Data.Sequence as Sequence
-import           Data.Map.Lazy (Map)
-import qualified Data.Map.Lazy as M
+import           Data.Map (Map)
+import qualified Data.Map as M
 import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.Encoding as TE
 
