@@ -1,5 +1,7 @@
 
-module Network.Monitoring.Riemann where
+module Network.Monitoring.Riemann (
+  module Network.Monitoring.Riemann.Lenses
+  ) where
 
-import Text.ProtocolBuffers
+import Network.Monitoring.Riemann.Lenses
 
