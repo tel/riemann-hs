@@ -19,6 +19,34 @@ import Text.ProtocolBuffers
 import Network.Socket
 import qualified Network.Socket.ByteString as NBS
 
+{-%
+
+In brief, a Riemann client has two operating conditions: (a) as a
+decoration of *real* code or (b) as a component of self-reflecting
+system component. In 95% of cases the client will be used for (a), so
+that's the easiest way to use the client.
+
+An (a)-style Riemann client should allow for liberal *decoration* of
+code with monitoring keys. These decorations should trivially reduce
+to nops if there is no connection to a Riemann server and they should
+silently ignore all server errors. The (a)-style Riemann decorations
+should never slow real code and thus must either be very, very fast or
+asynchronous.
+
+As a tradeoff, we can never be sure that *all* (a)-style decorations
+fire and are observed by a Riemann server. Neither the client or the
+server can take note of or be affected by packet failure.
+
+A (b)-style Riemann client should allow for smart load balancing. It
+should be able to guarantee connectivity to the Riemann server and
+failover along with the server should Riemann ever die or become
+partitioned. (To this end, there's some need for pools of Riemann
+servers, but this may be non-critical.) Riemann (b)-style interactions
+also include querying the Riemann server --- so we'll need a query
+combinator language.
+
+-}
+
 -- What kinds of monitors do we want?
 
 -- A default client should be specified which overwhelms all of these
