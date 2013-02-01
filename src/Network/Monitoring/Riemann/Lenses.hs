@@ -134,7 +134,7 @@ attributes' = evAttributes . mapping attIso
 
 -- | A lens convenient for setting attributes.
 attributes :: Simple Lens Event [(Text, Text)]
-attributes = attributes' . iso (catMaybes . map liftMay . toList)
+attributes = attributes' . iso (mapMaybe liftMay . toList)
                                (Sequence.fromList . map (second Just))
   where liftMay (a, b) = (,) <$> pure a <*> b
 
@@ -176,21 +176,20 @@ instance Monoid Event where
                 Ev.metric_sint64 = msi2,
                 Ev.metric_d = md2,
                 Ev.metric_f = mf2 }) =
-      (Ev.Event { Ev.time = t1 +++ t2,
-                  Ev.state = s1 +++ s2,
-                  Ev.service = comb " " se1 se2,
-                  Ev.host = comb "." h1 h2,
-                  Ev.description = d1 +++ d2,
-                  Ev.tags = ta1 <> ta2,
-                  Ev.ttl = liftA2 max tl1 tl2,
-                  Ev.attributes = a1 <> a2,
-                  Ev.metric_sint64 = msi1 +++ msi2,
-                  Ev.metric_d = md1 +++ md2,
-                  Ev.metric_f = mf1 +++ mf2 })
+      Ev.Event { Ev.time = t1 +++ t2,
+                 Ev.state = s1 +++ s2,
+                 Ev.service = comb " " se1 se2,
+                 Ev.host = comb "." h1 h2,
+                 Ev.description = d1 +++ d2,
+                 Ev.tags = ta1 <> ta2,
+                 Ev.ttl = liftA2 max tl1 tl2,
+                 Ev.attributes = a1 <> a2,
+                 Ev.metric_sint64 = msi1 +++ msi2,
+                 Ev.metric_d = md1 +++ md2,
+                 Ev.metric_f = mf1 +++ mf2 }
     where a +++ b = getLast $ Last a <> Last b
-          comb x a b = liftA2
-                       (\st1 st2 -> review utfI $ view utfI st1 <> x <> view utfI st2)
-                       a b
+          comb x = liftA2
+                   (\st1 st2 -> review utfI $ view utfI st1 <> x <> view utfI st2)
 
 -- $states
 
@@ -221,34 +220,34 @@ once = stOnce
 instance Monoid State where
   mempty = defaultValue
   mappend
-    (St.State {St.time = t1,
-               St.state = s1,
-               St.service = se1,
-               St.host = h1,
-               St.description = d1,
-               St.once = o1,
-               St.tags = ta1,
-               St.ttl = tl1})
-    (St.State {St.time = t2,
-               St.state = s2,
-               St.service = se2,
-               St.host = h2,
-               St.description = d2,
-               St.once = o2,
-               St.tags = ta2,
-               St.ttl = tl2}) =
-      (St.State {St.time = t1 +++ t2,
+    (St.State { St.time = t1,
+                St.state = s1,
+                St.service = se1,
+                St.host = h1,
+                St.description = d1,
+                St.once = o1,
+                St.tags = ta1,
+                St.ttl = tl1 })
+    (St.State { St.time = t2,
+                St.state = s2,
+                St.service = se2,
+                St.host = h2,
+                St.description = d2,
+                St.once = o2,
+                St.tags = ta2,
+                St.ttl = tl2 }) =
+      St.State { St.time = t1 +++ t2,
                  St.state = s1 +++ s2,
                  St.service = comb " " se1 se2,
                  St.host = comb "." h1 h2,
                  St.description = d1 +++ d2,
                  St.once = o1 +++ o2,
                  St.tags = ta1 <> ta2,
-                 St.ttl = liftA2 max tl1 tl2 })
+                 St.ttl = liftA2 max tl1 tl2 }
     where a +++ b = getLast $ Last a <> Last b
-          comb x a b = liftA2
-                       (\st1 st2 -> review utfI $ view utfI st1 <> x <> view utfI st2)
-                       a b
+          comb x = liftA2
+                   (\st1 st2 -> review utfI $ view utfI st1 <> x <> view utfI st2)
+  
 
 -- $msgs
 
@@ -293,11 +292,11 @@ instance Monoid Msg where
               Ms.states = s2,
               Ms.query = q2,
               Ms.events = ev2 }) =
-      (Ms.Msg { Ms.ok = liftA2 (&&) o1 o2,
-                Ms.error = e1 +++ e2,
-                Ms.states = s1 <> s2,
-                Ms.query = q1 +++ q2,
-                Ms.events = ev1 <> ev2 })
+      Ms.Msg { Ms.ok = liftA2 (&&) o1 o2,
+               Ms.error = e1 +++ e2,
+               Ms.states = s1 <> s2,
+               Ms.query = q1 +++ q2,
+               Ms.events = ev1 <> ev2 }
     where a +++ b = getLast $ Last a <> Last b
 
 
