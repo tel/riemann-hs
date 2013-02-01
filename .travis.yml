@@ -1,11 +1,11 @@
 language: haskell
 
 install:
-  - cabal configure -flib-Werror $mode
+  - cabal configure
   - cabal build
 
 script:
-  - $script && hlint src --cpp-define HLINT
+  - $script
 
 env:
   - mode="--enable-tests" script="cabal test --show-details=always"
