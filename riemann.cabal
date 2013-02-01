@@ -14,7 +14,15 @@ cabal-version:       >=1.10
 
 library
   exposed-modules: 
-  Network.Monitoring.Riemann
+    Network.Monitoring.Riemann
+    Network.Monitoring.Riemann.Lenses
+  other-modules:
+    Network.Monitoring.Riemann.Proto
+    Network.Monitoring.Riemann.Proto.Attribute
+    Network.Monitoring.Riemann.Proto.Event
+    Network.Monitoring.Riemann.Proto.Msg
+    Network.Monitoring.Riemann.Proto.Query
+    Network.Monitoring.Riemann.Proto.State
   build-depends:       
     base              >= 4.5.0,
     protocol-buffers  >= 2.0.12

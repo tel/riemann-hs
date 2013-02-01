@@ -11,11 +11,7 @@ distributed across a few type classes to make interacting with
 'metric' and the overlap between 'Event' and 'State' easier.
 
 This provides a much cleaner interface to the underlying Riemann types
-costing only some clarity in types. This allows you to build and edit
-Events using chains of lens updates like
-
->>> (attributes' .~ [("foo", Just "bar")) . (once .~ Nothing)
-
+costing only some clarity in types.
 
 I also provide 'Monoid' instances for times when combining 'Event's or
 'State's or 'Query's makes the most sense.
@@ -27,12 +23,12 @@ module Network.Monitoring.Riemann.Lenses (
   Metricable (..),
   Event,
   attributes, attributes', attributeMap,
-  -- State,
-  -- once,
-  -- Msg,
-  -- ok, merror, states, query, events,
-  -- Query,
-  -- qstring
+  State,
+  once,
+  Msg,
+  ok, merror, states, states', query, events, events',
+  Query,
+  qstring
   ) where
 
 import GHC.Int (Int64)
@@ -64,6 +60,8 @@ import qualified Network.Monitoring.Riemann.Proto.Query as Qu
 utfI :: Simple Iso Utf8 Text
 utfI = iso (\(Utf8 lbs) -> TE.decodeUtf8 lbs) (Utf8 . TE.encodeUtf8)
 
+-- $events
+
 -- | 'Stated' types are 'Event' and 'State' which both have
 -- information representing the state of a 'service' on a 'host' at a
 -- given 'time'. These shared types give rise to restrictedly
@@ -74,8 +72,11 @@ class Stated a where
   service     :: Simple Lens a (Maybe Text)
   host        :: Simple Lens a (Maybe Text)
   description :: Simple Lens a (Maybe Text)
-  tags        :: Simple Lens a (Seq Text)
+  tags'       :: Simple Lens a (Seq Text)
+  tags        :: Simple Lens a [Text]
   ttl         :: Simple Lens a (Maybe Float)
+
+  tags = tags' . iso toList Sequence.fromList
 
 -- | 'Metricable' types are those which can be 'metric's in an
 -- 'Event'. This class provides dispatch from Haskell's polymorphic
@@ -109,7 +110,7 @@ instance Stated Event where
   service = evService . mapping utfI
   host = evHost . mapping utfI
   description = evDescription . mapping utfI
-  tags = evTags . mapping utfI
+  tags' = evTags . mapping utfI
   ttl = evTtl
 
 -- | Lensing 'At.Attributes'
@@ -123,16 +124,21 @@ attIso = iso unAtt reAtt
     reAtt (k, v) = At.Attribute { At.key = review utfI k,
                                   At.value = fmap (review utfI) v }
 
-
+-- | This is the core attributes lens which just extracts the raw
+-- underlying 'Seq' representation. The important thing to note is
+-- that Protobufs allow for "empty" attributes but the other
+-- convenience lenses ('attributes' and 'attributeMap') do not.
 attributes' :: Simple Lens Event (Seq (Text, Maybe Text))
 attributes' = evAttributes . mapping attIso
   where z = 3
 
+-- | A lens convenient for setting attributes.
 attributes :: Simple Lens Event [(Text, Text)]
 attributes = attributes' . iso (catMaybes . map liftMay . toList)
                                (Sequence.fromList . map (second Just))
   where liftMay (a, b) = (,) <$> pure a <*> b
 
+-- | A lens convenient for getting attributes.
 attributeMap :: Simple Lens Event (Map Text Text)
 attributeMap = attributes . iso M.fromList M.toList
 
@@ -186,6 +192,7 @@ instance Monoid Event where
                        (\st1 st2 -> review utfI $ view utfI st1 <> x <> view utfI st2)
                        a b
 
+-- $states
 
 $(makeLensesFor [("time", "stTime"),
                  ("state", "stState"),
@@ -203,7 +210,7 @@ instance Stated State where
   service = stService . mapping utfI
   host = stHost . mapping utfI
   description = stDescription . mapping utfI
-  tags = stTags . mapping utfI
+  tags' = stTags . mapping utfI
   ttl = stTtl
 
 -- This could just be done during the lens derivation, but this is
@@ -242,7 +249,8 @@ instance Monoid State where
           comb x a b = liftA2
                        (\st1 st2 -> review utfI $ view utfI st1 <> x <> view utfI st2)
                        a b
-          
+
+-- $msgs
 
 $(makeLensesFor [("ok", "msgOk"),
                  ("error", "msgError"),
@@ -257,14 +265,20 @@ ok = msgOk
 merror :: Simple Lens Msg (Maybe Text)
 merror = msgError . mapping utfI
 
-states :: Simple Lens Msg (Seq State)
-states = msgStates
+states' :: Simple Lens Msg (Seq State)
+states' = msgStates
+
+states :: Simple Lens Msg [State]
+states = states' . iso toList Sequence.fromList
 
 query :: Simple Lens Msg (Maybe Query)
 query = msgQuery
 
-events :: Simple Lens Msg (Seq Event)
-events = msgEvents
+events' :: Simple Lens Msg (Seq Event)
+events' = msgEvents
+
+events :: Simple Lens Msg [Event]
+events = events' . iso toList Sequence.fromList
 
 instance Monoid Msg where
   mempty = defaultValue
@@ -286,6 +300,8 @@ instance Monoid Msg where
                 Ms.events = ev1 <> ev2 })
     where a +++ b = getLast $ Last a <> Last b
 
+
+-- $queries
 
 $(makeLensesFor [("string", "qString")] ''Query)
 
