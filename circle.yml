@@ -1,0 +1,14 @@
+machine:
+  environment:
+
+dependencies:
+  override:
+    - cabal update
+    - cabal install --only-dependencies --enable-test
+
+test:
+  pre:
+    - cabal configure --enable-tests
+    - cabal build
+  override:
+    - cabal test
