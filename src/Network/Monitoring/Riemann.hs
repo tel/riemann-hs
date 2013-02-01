@@ -54,6 +54,32 @@ combinator language.
 -- TCP clients should be MChan based independent TCP clients
 -- UDP clients can just be pure send/receive
 
+{-%
+
+API Design
+----------
+
+Basic events ought to be generated very easily. Sane defaults ought to
+be built-in---we shouldn't be specifying the host in every decorated
+call, we shouldn't have any concept of the current time when we
+decorate an action. To this end the Monoid instances for `Event`s,
+`State`s, `Msg`s, and `Query`s are designed to either grow or be
+overridden to the right (using lots of `Last` newtypes over maybes and
+inner `(<>)` applications).
+
+The Client also should be defaulted at as high a level as possible.
+
+e.g.
+
+```
+withClient :: Client -> IO a -> IO a
+withDefaultEvent :: Event -> IO a -> IO a
+withEventTiming :: IO a -> IO a
+withHostname :: Text -> IO a -> IO a
+```
+
+-}
+
 data Client = UDP (Maybe (Socket, AddrInfo))
             deriving (Show, Eq)
 
