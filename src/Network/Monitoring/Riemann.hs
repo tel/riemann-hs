@@ -19,8 +19,6 @@ import Text.ProtocolBuffers
 import Network.Socket
 import qualified Network.Socket.ByteString as NBS
 
-import System.Random
-
 -- What kinds of monitors do we want?
 
 -- A default client should be specified which overwhelms all of these
@@ -74,8 +72,3 @@ sendEvent' (UDP (Just (s, addy))) e =
   $ (\bs -> NBS.sendManyTo s bs (addrAddress addy))
   $ L.toChunks $ runPut $ messagePutM
   $ (events .~ [e]) mempty
-
-spam = do c <- makeClient "localhost" 5555
-          sequence_ $ replicate 3000 (m c)
-  where m c = do v <- randomRIO (0, 500) :: IO Float
-                 sendEvent c (ev "localhost" "value" v)
