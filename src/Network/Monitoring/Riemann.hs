@@ -8,6 +8,7 @@ import Network.Monitoring.Riemann.Lenses
 
 import Data.Monoid
 import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as T
 import qualified Data.ByteString.Lazy as L
 import Control.Applicative
 import Control.Monad
@@ -104,16 +105,16 @@ riemann $ (tags ..~ "foo") $ ev "<service>" <metric>
 
 -- | Create a simple 'Event' with state "ok".
 --
--- >>> evOk "service" (0 :: Int64) ^. state
+-- >>> evOk (T.pack "service") (0 :: Int64) ^. state
 -- Just "ok"
 --
--- >>> evOk "service" (0 :: Int64) ^. service
+-- >>> evOk (T.pack "service") (0 :: Int64) ^. service
 -- Just "service"
 --
--- >>> evOk "service" (0 :: Int64) ^. metric
+-- >>> evOk (T.pack "service") (0 :: Int64) ^. metric :: Maybe Int64
 -- Just 0
 --
--- >>> evOk "service" (0 :: Int64) ^. tags
+-- >>> evOk (T.pack "service") (0 :: Int64) ^. tags
 -- []
 evOk :: Metricable a => Text -> a -> Event
 evOk serv met = mempty & (state   ..~ "ok")
