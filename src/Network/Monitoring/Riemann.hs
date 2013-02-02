@@ -47,13 +47,6 @@ combinator language.
 
 -}
 
--- What kinds of monitors do we want?
-
--- A default client should be specified which overwhelms all of these
-
--- TCP clients should be MChan based independent TCP clients
--- UDP clients can just be pure send/receive
-
 {-%
 
 API Design
@@ -79,6 +72,53 @@ withHostname :: Text -> IO a -> IO a
 ```
 
 -}
+
+{-%
+
+Implementation
+--------------
+
+There are roughly two independent factors for library design. First,
+we can use UDP or TCP---Riemann size limits UDP datagrams, but the
+limit is high (16 mb by default), so there's theoretically a corner
+case there but it's a fair bet that we won't hit it---and secondly we
+can deliver them in the main thread or asynchronously via a concurrent
+process.
+
+There's a tradeoff here between throughput and assurance. Asynch+UDP
+has the highest throughput, while Synch+TCP has the greatest
+assurance. We'll optimize for (a)-type decoration via Asynch+UDP.
+
+Can we do the same and optimize (b)-type calls as Synch+TCP? Probably.
+
+-}
+
+{-%
+
+Syntax
+------
+
+riemann $ (tags ..~ "foo") $ ev "<service>" <metric>
+
+-}
+
+-- | Create a simple 'Event' with state "ok".
+--
+-- >>> evOk "service" (0 :: Int64) ^. state
+-- Just "ok"
+--
+-- >>> evOk "service" (0 :: Int64) ^. service
+-- Just "service"
+--
+-- >>> evOk "service" (0 :: Int64) ^. metric
+-- Just 0
+--
+-- >>> evOk "service" (0 :: Int64) ^. tags
+-- []
+evOk :: Metricable a => Text -> a -> Event
+evOk serv met = mempty & (state   ..~ "ok")
+                       . (service ..~ serv)
+                       . (metric  ..~ met)
 
 data Client = UDP (Maybe (Socket, AddrInfo))
             deriving (Show, Eq)

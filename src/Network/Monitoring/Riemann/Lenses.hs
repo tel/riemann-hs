@@ -19,6 +19,7 @@ I also provide 'Monoid' instances for times when combining 'Event's or
 -}
 
 module Network.Monitoring.Riemann.Lenses (
+  (..~),
   Stated (..), Int64,
   Metricable (..),
   Event,
@@ -60,6 +61,14 @@ import qualified Network.Monitoring.Riemann.Proto.Query as Qu
 utfI :: Simple Iso Utf8 Text
 utfI = iso (\(Utf8 lbs) -> TE.decodeUtf8 lbs) (Utf8 . TE.encodeUtf8)
 
+-- | A slight variation on '(.~)' which also includes applying 'pure'
+-- over the 'Setting' Read it as "set pure". It's very useful for
+-- setting properties on 'Event's and 'State's without littering
+-- 'Just's everywhere.
+infixr 4 ..~
+(..~) :: Applicative f => Setting s t a (f b) -> b -> s -> t
+l ..~ v = l .~ pure v
+
 -- $events
 
 -- | 'Stated' types are 'Event' and 'State' which both have
@@ -73,9 +82,9 @@ class Stated a where
   host        :: Simple Lens a (Maybe Text)
   description :: Simple Lens a (Maybe Text)
   tags'       :: Simple Lens a (Seq Text)
-  tags        :: Simple Lens a [Text]
   ttl         :: Simple Lens a (Maybe Float)
 
+  tags         :: Simple Lens a [Text]
   tags = tags' . iso toList Sequence.fromList
 
 -- | 'Metricable' types are those which can be 'metric's in an
