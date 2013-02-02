@@ -66,7 +66,6 @@ utfI = iso (\(Utf8 lbs) -> TE.decodeUtf8 lbs) (Utf8 . TE.encodeUtf8)
 -- setting properties on 'Event's and 'State's without littering
 -- 'Just's everywhere.
 infixr 4 ..~
-(..~) :: Applicative f => Setting s t a (f b) -> b -> s -> t
 l ..~ v = l .~ pure v
 
 -- $events
