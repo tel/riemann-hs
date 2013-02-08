@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Network.Monitoring.Riemann (
-  module Network.Monitoring.Riemann.Lenses
+  module Network.Monitoring.Riemann.Lenses,
+  Client, makeClient,
+  evOk,
+  sendEvent, sendEvent'
   ) where
 
 import Network.Monitoring.Riemann.Lenses
@@ -10,8 +13,11 @@ import Data.Monoid
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as T
 import qualified Data.ByteString.Lazy as L
+import Data.Time.Clock.POSIX
+
 import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.Error
 import Control.Exception
 import Control.Lens
@@ -99,7 +105,7 @@ Can we do the same and optimize (b)-type calls as Synch+TCP? Probably.
 Syntax
 ------
 
-riemann $ (tags ..~ "foo") $ ev "<service>" <metric>
+riemann $ ev "<service>" <metric> & (tags ..~ "foo")
 
 -}
 
@@ -147,23 +153,15 @@ makeClient hn po = UDP . rightMay <$> sock
                                    (addrProtocol addy)
                        return (s, addy)
 
-ev :: Metricable a => Text -> Text -> a -> Event
-ev h s m = (host .~ Just h)
-           . (state .~ Just "ok")
-           . (service .~ Just s)
-           . (metric  .~ Just m)
-           $ mempty
-
 -- | Attempts to forward an event to a client. Fails silently.
-sendEvent :: Client -> Event -> IO ()
-sendEvent c = void . runEitherT . sendEvent' c
+sendEvent :: MonadIO m => Client -> Event -> m ()
+sendEvent c = liftIO . void . runEitherT . sendEvent' c
 
 -- | Attempts to forward an event to a client. If it fails, it'll
 -- return an 'IOException' in the 'Either'.
 sendEvent' :: Client -> Event -> EitherT IOException IO ()
 sendEvent' (UDP Nothing)  _ = return ()
-sendEvent' (UDP (Just (s, addy))) e =
-  tryIO
-  $ (\bs -> NBS.sendManyTo s bs (addrAddress addy))
-  $ L.toChunks $ runPut $ messagePutM
-  $ (events .~ [e]) mempty
+sendEvent' (UDP (Just (s, addy))) e = tryIO $ do
+  now <- fmap round getPOSIXTime
+  let msg = set events [(time ..~ now) e] mempty
+  NBS.sendManyTo s (L.toChunks . runPut . messagePutM $ msg) (addrAddress addy)
