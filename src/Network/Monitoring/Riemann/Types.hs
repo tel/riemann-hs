@@ -182,18 +182,29 @@ wrapMaybe a = oneof [pure Nothing, Just <$> a]
 arbText :: Gen Text
 arbText = T.pack <$> listOf1 (choose ('1', 'Z'))
 
--- instance Arbitrary Event where
---   arbitrary = do
---     time <- arbitrary `suchThatMaybe` (>0)
---     state <- wrapMaybe (elements "ok" "warning" "error" "failure" "banana")
---     service <- wrapMaybe (T.unwords <$> listOf1 arbText)
---     return $ mempty 
---     -- host
---     -- description
---     -- tags
---     -- ttl
---     -- attributes
---     -- metric
+instance Arbitrary Event where
+  arbitrary = do
+    -- random components
+    atime        <- arbitrary `suchThatMaybe` (>0)
+    astate       <- wrapMaybe (elements ["ok", "warning", "error", "failure", "banana"])
+    aservice     <- wrapMaybe (T.unwords <$> listOf1 arbText)
+    ahost        <- wrapMaybe (T.unwords <$> listOf1 arbText)
+    adescription <- wrapMaybe (T.unwords <$> listOf1 arbText)
+    sometags     <- listOf arbText
+    attl         <- arbitrary `suchThatMaybe` (>0)
+    someattrs    <- listOf $ (,) <$> arbText <*> arbText
+    ametric      <- wrapMaybe arbitrary
+    -- build into a random event
+    return $ flip St.execState mempty $ do
+      time        .= atime
+      state       .= astate
+      service     .= aservice
+      host        .= ahost
+      description .= adescription
+      tags        .= sometags
+      ttl         .= attl
+      attributes  .= someattrs
+      metric      .= (ametric :: Maybe Float)
 
 -- | Create a simple 'Event' with state "ok".
 --
@@ -256,6 +267,28 @@ instance Monoid State where
       last a b = getLast $ Last a <> Last b 
       comb x = liftA2 (\st1 st2 -> st1 <> x <> st2)
 
+instance Arbitrary State where
+  arbitrary = do
+  -- random components
+  atime        <- arbitrary `suchThatMaybe` (>0)
+  astate       <- wrapMaybe (elements ["ok", "warning", "error", "failure", "banana"])
+  aservice     <- wrapMaybe (T.unwords <$> listOf1 arbText)
+  ahost        <- wrapMaybe (T.unwords <$> listOf1 arbText)
+  adescription <- wrapMaybe (T.unwords <$> listOf1 arbText)
+  sometags     <- listOf arbText
+  attl         <- arbitrary `suchThatMaybe` (>0)
+  aonce        <- wrapMaybe arbitrary
+  -- build into a random event
+  return $ flip St.execState mempty $ do
+    time        .= atime
+    state       .= astate
+    service     .= aservice
+    host        .= ahost
+    description .= adescription
+    tags        .= sometags
+    ttl         .= attl
+    once        .= aonce
+
 -- $msgs
 
 $(makeLensesFor [("ok", "msgOk"),
@@ -300,6 +333,22 @@ instance Monoid Msg where
       -- Some default "combiners"
       last a b = getLast $ Last a <> Last b
 
+instance Arbitrary Msg where
+  arbitrary = do
+  -- random components
+  anok        <- wrapMaybe arbitrary
+  anerror     <- wrapMaybe (T.unwords <$> listOf1 arbText)
+  somestates <- listOf arbitrary
+  aquery <- wrapMaybe arbitrary
+  someevents <- listOf arbitrary
+  -- build into a random event
+  return $ flip St.execState mempty $ do
+    ok        .= anok
+    merror .= anerror
+    states .= somestates
+    query .= aquery
+    events .= someevents
+
 -- $queries
 
 $(makeLensesFor [("string", "qString")] ''Query)
@@ -311,3 +360,7 @@ instance Monoid Query where
   mempty = defaultValue
   mappend (Qu.Query s1) (Qu.Query s2) = Qu.Query { Qu.string = s1 +++ s2 }
     where a +++ b = getLast $ Last a <> Last b
+
+instance Arbitrary Query where
+  -- TODO: Make a real arbitrary instance...
+  arbitrary = pure $ mempty & (qstring ?~ "")
