@@ -44,5 +44,9 @@ observed :: Riemann a -> (a, [Event])
 observed = runIdentity . observedT
 
 -- | Extracts the observed events from a 'RiemannT' monad
+--
+-- If the monad below is 'IO' then this does not lazily produce
+-- values; however, 'runRiemannT' does, so perhaps it has something to
+-- do with the 'WriterT'.
 observedT :: Monad m => RiemannT m a -> m (a, [Event])
 observedT rmt = runWriterT $ runProxy (raiseK (unRiemannT rmt) >-> toListD)
