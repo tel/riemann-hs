@@ -13,6 +13,8 @@ import Control.Proxy hiding (Client)
 
 type Prx = ProxyFast
 
+-- | A monad transformer layer which allows for the observation of
+-- Riemann 'Event's.
 newtype RiemannT m a =
   RiemannT (Prx () () () Event m a)
   deriving (Functor, Applicative, Monad, MonadTrans, MonadIO)
@@ -22,6 +24,8 @@ newtype RiemannT m a =
 unRiemannT :: RiemannT m a -> () -> Prx () () () Event m a
 unRiemannT (RiemannT m) () = m
 
+-- | A monad allowing the observation of Riemann 'Event's. Equivalent
+-- to 'RiemannT Identity'.
 type Riemann = RiemannT Identity
 
 -- | Observes an 'Event' in the 'RiemannT' monad.
