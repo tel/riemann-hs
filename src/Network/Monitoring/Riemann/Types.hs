@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 {-%
@@ -18,8 +19,7 @@ I also provide 'Monoid' instances for times when combining 'Event's or
 
 -}
 
-module Network.Monitoring.Riemann.Lenses (
-  (..~),
+module Network.Monitoring.Riemann.Types (
   Stated (..), Int64,
   Metricable (..),
   Event,
@@ -34,7 +34,8 @@ module Network.Monitoring.Riemann.Lenses (
 
 import GHC.Int (Int64)
 
-import Control.Lens
+import Control.Lens hiding (elements)
+import qualified Control.Monad.State as St
 import Control.Applicative
 import Control.Arrow
 import Control.Error
@@ -45,6 +46,7 @@ import qualified Data.Sequence as Sequence
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as TE
 
 import Text.ProtocolBuffers
@@ -58,15 +60,10 @@ import qualified Network.Monitoring.Riemann.Proto.Attribute as At
 import qualified Network.Monitoring.Riemann.Proto.Msg as Ms
 import qualified Network.Monitoring.Riemann.Proto.Query as Qu
 
+import Test.QuickCheck hiding (once)
+
 utfI :: Simple Iso Utf8 Text
 utfI = iso (\(Utf8 lbs) -> TE.decodeUtf8 lbs) (Utf8 . TE.encodeUtf8)
-
--- | A slight variation on '(.~)' which also includes applying 'pure'
--- over the 'Setting' Read it as "set pure". It's very useful for
--- setting properties on 'Event's and 'State's without littering
--- 'Just's everywhere.
-infixr 4 ..~
-l ..~ v = l .~ pure v
 
 -- $events
 
@@ -161,43 +158,62 @@ instance Metricable Float where
 
 instance Monoid Event where
   mempty = defaultValue
-  mappend
-    (Ev.Event { Ev.time = t1,
-                Ev.state = s1,
-                Ev.service = se1,
-                Ev.host = h1,
-                Ev.description = d1,
-                Ev.tags = ta1,
-                Ev.ttl = tl1,
-                Ev.attributes = a1,
-                Ev.metric_sint64 = msi1,
-                Ev.metric_d = md1,
-                Ev.metric_f = mf1 })
-    (Ev.Event { Ev.time = t2,
-                Ev.state = s2,
-                Ev.service = se2,
-                Ev.host = h2,
-                Ev.description = d2,
-                Ev.tags = ta2,
-                Ev.ttl = tl2,
-                Ev.attributes = a2,
-                Ev.metric_sint64 = msi2,
-                Ev.metric_d = md2,
-                Ev.metric_f = mf2 }) =
-      Ev.Event { Ev.time = t1 +++ t2,
-                 Ev.state = s1 +++ s2,
-                 Ev.service = comb " " se1 se2,
-                 Ev.host = comb "." h1 h2,
-                 Ev.description = d1 +++ d2,
-                 Ev.tags = ta1 <> ta2,
-                 Ev.ttl = liftA2 max tl1 tl2,
-                 Ev.attributes = a1 <> a2,
-                 Ev.metric_sint64 = msi1 +++ msi2,
-                 Ev.metric_d = md1 +++ md2,
-                 Ev.metric_f = mf1 +++ mf2 }
-    where a +++ b = getLast $ Last a <> Last b
-          comb x = liftA2
-                   (\st1 st2 -> review utfI $ view utfI st1 <> x <> view utfI st2)
+  e1 `mappend` e2 = flip St.execState e1 $ do
+    time            >< last
+    state           >< last
+    host            >< (comb ".")
+    description     >< last
+    tags            >< mappend
+    ttl             >< (liftA2 max)
+    attributes      >< mappend
+    evMetric_sint64 >< last
+    evMetric_f      >< last
+    evMetric_d      >< last
+    where
+      -- Update e1 with values from e2 combining with `op`
+      (><) (lens :: Simple Lens s a) op = lens %= (`op` (e2 ^. lens))
+      -- Some default "combiners"
+      last a b = getLast $ Last a <> Last b
+      comb x = liftA2 (\st1 st2 -> st1 <> x <> st2)
+
+wrapMaybe :: Gen a -> Gen (Maybe a)
+wrapMaybe a = oneof [pure Nothing, Just <$> a]
+
+arbText :: Gen Text
+arbText = T.pack <$> listOf1 (choose ('1', 'Z'))
+
+-- instance Arbitrary Event where
+--   arbitrary = do
+--     time <- arbitrary `suchThatMaybe` (>0)
+--     state <- wrapMaybe (elements "ok" "warning" "error" "failure" "banana")
+--     service <- wrapMaybe (T.unwords <$> listOf1 arbText)
+--     return $ mempty 
+--     -- host
+--     -- description
+--     -- tags
+--     -- ttl
+--     -- attributes
+--     -- metric
+
+-- | Create a simple 'Event' with state "ok".
+--
+-- >>> evOk (T.pack "service") (0 :: Int64) ^. state
+-- Just "ok"
+--
+-- >>> evOk (T.pack "service") (0 :: Int64) ^. service
+-- Just "service"
+--
+-- >>> evOk (T.pack "service") (0 :: Int64) ^. metric :: Maybe Int64
+-- Just 0
+--
+-- >>> evOk (T.pack "service") (0 :: Int64) ^. tags
+-- []
+evOk :: Metricable a => Text -> a -> Event
+evOk serv met =
+  flip St.execState mempty $ do
+    state   ?= "ok"
+    service ?= serv
+    metric  ?= met
 
 -- $states
 
@@ -227,35 +243,18 @@ once = stOnce
 
 instance Monoid State where
   mempty = defaultValue
-  mappend
-    (St.State { St.time = t1,
-                St.state = s1,
-                St.service = se1,
-                St.host = h1,
-                St.description = d1,
-                St.once = o1,
-                St.tags = ta1,
-                St.ttl = tl1 })
-    (St.State { St.time = t2,
-                St.state = s2,
-                St.service = se2,
-                St.host = h2,
-                St.description = d2,
-                St.once = o2,
-                St.tags = ta2,
-                St.ttl = tl2 }) =
-      St.State { St.time = t1 +++ t2,
-                 St.state = s1 +++ s2,
-                 St.service = comb " " se1 se2,
-                 St.host = comb "." h1 h2,
-                 St.description = d1 +++ d2,
-                 St.once = o1 +++ o2,
-                 St.tags = ta1 <> ta2,
-                 St.ttl = liftA2 max tl1 tl2 }
-    where a +++ b = getLast $ Last a <> Last b
-          comb x = liftA2
-                   (\st1 st2 -> review utfI $ view utfI st1 <> x <> view utfI st2)
-  
+  s1 `mappend` s2 = flip St.execState s1 $ do
+    time        >< last
+    state       >< last
+    service     >< (comb " ")
+    host        >< (comb ".")
+    description >< last
+    where
+      -- Update s1 with values from s2 combining with `op`
+      (><) (lens :: Simple Lens s a) op = lens %= (`op` (s2 ^. lens))
+      -- Some default "combiners"
+      last a b = getLast $ Last a <> Last b 
+      comb x = liftA2 (\st1 st2 -> st1 <> x <> st2)
 
 -- $msgs
 
@@ -289,24 +288,17 @@ events = events' . iso toList Sequence.fromList
 
 instance Monoid Msg where
   mempty = defaultValue
-  mappend
-    (Ms.Msg { Ms.ok = o1,
-              Ms.error = e1,
-              Ms.states = s1,
-              Ms.query = q1,
-              Ms.events = ev1 })
-    (Ms.Msg { Ms.ok = o2,
-              Ms.error = e2,
-              Ms.states = s2,
-              Ms.query = q2,
-              Ms.events = ev2 }) =
-      Ms.Msg { Ms.ok = liftA2 (&&) o1 o2,
-               Ms.error = e1 +++ e2,
-               Ms.states = s1 <> s2,
-               Ms.query = q1 +++ q2,
-               Ms.events = ev1 <> ev2 }
-    where a +++ b = getLast $ Last a <> Last b
-
+  m1 `mappend` m2 = flip St.execState m1 $ do
+    ok     >< (liftA2 (&&))
+    merror >< last
+    states >< mappend
+    query  >< last
+    events >< mappend
+    where
+      -- Update m1 with values from m2 combining with `op`
+      (><) (lens :: Simple Lens s a) op = lens %= (`op` (m2 ^. lens))
+      -- Some default "combiners"
+      last a b = getLast $ Last a <> Last b
 
 -- $queries
 

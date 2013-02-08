@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Network.Monitoring.Riemann (
-  module Network.Monitoring.Riemann.Lenses,
+  module Network.Monitoring.Riemann.Types,
   Client, makeClient,
   evOk,
   sendEvent, sendEvent'
   ) where
 
-import Network.Monitoring.Riemann.Lenses
+import Network.Monitoring.Riemann.Types
 
 import Data.Monoid
 import Data.Text.Lazy (Text)
@@ -105,27 +105,9 @@ Can we do the same and optimize (b)-type calls as Synch+TCP? Probably.
 Syntax
 ------
 
-riemann $ ev "<service>" <metric> & (tags ..~ "foo")
+riemann $ ev "<service>" <metric> & (tags ?~ "foo")
 
 -}
-
--- | Create a simple 'Event' with state "ok".
---
--- >>> evOk (T.pack "service") (0 :: Int64) ^. state
--- Just "ok"
---
--- >>> evOk (T.pack "service") (0 :: Int64) ^. service
--- Just "service"
---
--- >>> evOk (T.pack "service") (0 :: Int64) ^. metric :: Maybe Int64
--- Just 0
---
--- >>> evOk (T.pack "service") (0 :: Int64) ^. tags
--- []
-evOk :: Metricable a => Text -> a -> Event
-evOk serv met = mempty & (state   ..~ "ok")
-                       . (service ..~ serv)
-                       . (metric  ..~ met)
 
 data Client = UDP (Maybe (Socket, AddrInfo))
             deriving (Show, Eq)

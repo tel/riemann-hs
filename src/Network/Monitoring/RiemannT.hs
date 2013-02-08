@@ -2,7 +2,6 @@
 
 module Network.Monitoring.RiemannT where
 
-import Network.Monitoring.Riemann.Lenses
 import Network.Monitoring.Riemann
 
 import Data.Functor.Identity
