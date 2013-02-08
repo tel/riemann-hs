@@ -24,6 +24,7 @@ module Network.Monitoring.Riemann.Types (
   Metricable (..),
   Event,
   attributes, attributes', attributeMap,
+  evOk,
   State,
   once,
   Msg,
