@@ -336,17 +336,17 @@ instance Monoid Msg where
 instance Arbitrary Msg where
   arbitrary = do
   -- random components
-  anok        <- wrapMaybe arbitrary
-  anerror     <- wrapMaybe (T.unwords <$> listOf1 arbText)
+  anok       <- wrapMaybe arbitrary
+  anerror    <- wrapMaybe (T.unwords <$> listOf1 arbText)
   somestates <- listOf arbitrary
-  aquery <- wrapMaybe arbitrary
+  aquery     <- wrapMaybe arbitrary
   someevents <- listOf arbitrary
   -- build into a random event
   return $ flip St.execState mempty $ do
-    ok        .= anok
+    ok     .= anok
     merror .= anerror
     states .= somestates
-    query .= aquery
+    query  .= aquery
     events .= someevents
 
 -- $queries
