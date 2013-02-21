@@ -1,4 +1,5 @@
 cabal-dev/
 dist/
+dist_*/
 clj
-.hsenv_riemann-hs
+.hsenv_*
