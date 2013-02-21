@@ -216,7 +216,13 @@ instance HasState Event where
 class AMetric a where
   metric :: Lens' Event (Maybe a)
 
-instance AMetric (Signed Int64)  where metric = eventMetricSInt . value'
+instance AMetric Int where 
+  metric = eventMetricSInt . value' . mapping (iso fromIntegral fromIntegral)
+instance AMetric Integer where 
+  metric = eventMetricSInt . value' . mapping (iso fromIntegral fromIntegral)
+instance AMetric (Signed Int64) where 
+  metric = eventMetricSInt . value'
+
 instance AMetric Double where metric = eventMetricD    . value'
 instance AMetric Float  where metric = eventMetricF    . value'
 
