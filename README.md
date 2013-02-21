@@ -1,9 +1,10 @@
-Riemann for Haskell
-===================
+A Riemann Client for Haskell
+============================
 
 [![Build Status](https://travis-ci.org/tel/riemann-hs.png?branch=master)](https://travis-ci.org/tel/riemann-hs)
 
-Nothing too fancy here yet.
+Nothing too fancy here yet. I might call this `Zeta` as well if it's not too
+confusing with previous designs at https://github.com/reifyhealth/zeta.
 
 Todos
 -----
