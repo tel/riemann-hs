@@ -2,29 +2,28 @@
 
 module Network.Monitoring.Riemann (
   module Network.Monitoring.Riemann.Types,
-  Client, makeClient,
-  evOk,
-  sendEvent, sendEvent'
+  module Data.Int,
+  Client, makeClient
+  {-sendEvent, sendEvent'-}
   ) where
 
 import Network.Monitoring.Riemann.Types
 
-import Data.Monoid
-import Data.Text.Lazy (Text)
-import qualified Data.Text.Lazy as T
-import qualified Data.ByteString.Lazy as L
+import Data.Int
+import Data.Default
 import Data.Time.Clock.POSIX
+import Data.ProtocolBuffers
+import Data.Serialize.Put
 
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Error
-import Control.Exception
 import Control.Lens
+import Control.Exception
 
-import Text.ProtocolBuffers
-import Network.Socket
-import qualified Network.Socket.ByteString as NBS
+import Network.Socket hiding (send, sendTo, recv, recvFrom)
+import Network.Socket.ByteString
 
 {-%
 
@@ -105,7 +104,7 @@ Can we do the same and optimize (b)-type calls as Synch+TCP? Probably.
 Syntax
 ------
 
-riemann $ ev "<service>" <metric> & (tags ?~ "foo")
+riemann $ ev "<service>" <metric> & tags <>~ "foo"
 
 -}
 
@@ -145,5 +144,5 @@ sendEvent' :: Client -> Event -> EitherT IOException IO ()
 sendEvent' (UDP Nothing)  _ = return ()
 sendEvent' (UDP (Just (s, addy))) e = tryIO $ do
   now <- fmap round getPOSIXTime
-  let msg = set events [(time ..~ now) e] mempty
-  NBS.sendManyTo s (L.toChunks . runPut . messagePutM $ msg) (addrAddress addy)
+  let msg = def & events .~ [e & time ?~ now]
+  void $ sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
