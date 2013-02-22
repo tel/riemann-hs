@@ -370,7 +370,7 @@ events :: Lens' Msg [Event]
 events = msgEvents . field
 
 instance Show Msg where
-  show s = "State { " ++ intercalate ", " innards ++ " }"  
+  show s = "Msg { " ++ intercalate ", " innards ++ " }"  
     where innards = catMaybes [
             showMsgState,
             showL "states" states,
@@ -380,10 +380,10 @@ instance Show Msg where
           showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
           showL name l = let lst = s ^. l 
                          in if null lst then Nothing else Just $ name ++ " = " ++ show lst
-          showMsgState = Just . ("msgState = " ++) $ case s ^. msgState of
-            Ok -> "Ok"
-            Error err -> "Error " ++ show err
-            Unknown -> "Unknown"
+          showMsgState = ("msgState = " ++) <$> case s ^. msgState of
+            Ok -> Just "Ok"
+            Error err -> Just $ "Error " ++ show err
+            Unknown -> Nothing
 
 instance HasQuery Msg where
   query = msgQuery . field
