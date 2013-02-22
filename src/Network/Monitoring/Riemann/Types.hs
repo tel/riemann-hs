@@ -166,7 +166,7 @@ once :: Lens' State (Maybe Bool)
 once = stateOnce . field
 
 instance Show State where
-  show s = "State { " ++ intercalate " ," innards ++ " }"  
+  show s = "State { " ++ intercalate ", " innards ++ " }"  
     where innards = catMaybes [
             showM "time" time,
             showM "state" state,
@@ -256,7 +256,7 @@ attributes = eventAttributes
         sequen (a, fb) = (a,) <$> fb
 
 instance Show Event where
-  show s = "Event { " ++ intercalate " ," innards ++ " }"  
+  show s = "Event { " ++ intercalate ", " innards ++ " }"  
     where innards = catMaybes [
             showM "time" time,
             showM "state" state,
@@ -333,7 +333,7 @@ instance Monoid Query where
   mappend = defMappend
 
 instance Show Query where
-  show s = "Query { " ++ intercalate " ," innards ++ " }"  
+  show s = "Query { " ++ intercalate ", " innards ++ " }"  
     where innards = catMaybes [
             showM "query" query
             ]
@@ -367,7 +367,7 @@ events :: Lens' Msg [Event]
 events = msgEvents . field
 
 instance Show Msg where
-  show s = "State { " ++ intercalate " ," innards ++ " }"  
+  show s = "State { " ++ intercalate ", " innards ++ " }"  
     where innards = catMaybes [
             showMsgState,
             showL "states" states,
