@@ -27,6 +27,7 @@ import Data.Monoid
 import Data.Maybe
 import Data.Time.Clock
 import Data.Default
+import Data.List
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Map (Map)
@@ -107,7 +108,7 @@ data State = State {
   _stateOnce        :: Optional D6 (Value Bool),
   _stateTags        :: Repeated D7 (Value Text),
   _stateTtl         :: Optional D8 (Value Float)
-  } deriving (Eq, Show, Generic)
+  } deriving (Eq, Generic)
 
 -- | 'Event' is a description of an application-level event, emitted
 -- to Riemann for indexing.
@@ -124,11 +125,11 @@ data Event = Event {
   _eventMetricSInt  :: Optional (D1 :* D3) (Value (Signed Int64)),
   _eventMetricD     :: Optional (D1 :* D4) (Value Double),
   _eventMetricF     :: Optional (D1 :* D5) (Value Float)
-  } deriving (Eq, Show, Generic)
+  } deriving (Eq, Generic)
 
 -- | 'Query' is a question to be made of the Riemann index.
 data Query = Query { _queryQuery :: Optional D1 (Value Text) }
-           deriving (Eq, Show, Generic)
+           deriving (Eq, Generic)
 
 -- | 'Msg' is a wrapper for sending/receiving multiple 'State's,
 -- 'Event's, or a single 'Query'.
@@ -138,7 +139,7 @@ data Msg = Msg {
   _msgStates :: Repeated D4 (Message State),
   _msgQuery  :: Optional D5 (Message Query),
   _msgEvents :: Repeated D6 (Message Event)
-  } deriving (Eq, Show, Generic)
+  } deriving (Eq, Generic)
 
 -- | 'Attribute' is a key/value pair.
 data Attribute = Attribute {
@@ -163,6 +164,22 @@ instance HasState State where
 
 once :: Lens' State (Maybe Bool)
 once = stateOnce . field
+
+instance Show State where
+  show s = "State { " ++ intercalate " ," innards ++ " }"  
+    where innards = catMaybes [
+            showM "time" time,
+            showM "state" state,
+            showM "service" service,
+            showM "host" host,
+            showM "description" description,
+            showL "tags" tags,
+            showM "ttl" ttl,
+            showM "once" once
+            ]
+          showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
+          showL name l = let lst = s ^. l 
+                         in if null lst then Nothing else Just $ name ++ " = " ++ show lst
 
 instance Default State where
   def = State {
@@ -237,6 +254,26 @@ attributes = eventAttributes
              . iso M.fromList M.toList
   where sequen :: Applicative f => (a, f b) -> f (a, b)
         sequen (a, fb) = (a,) <$> fb
+
+instance Show Event where
+  show s = "Event { " ++ intercalate " ," innards ++ " }"  
+    where innards = catMaybes [
+            showM "time" time,
+            showM "state" state,
+            showM "service" service,
+            showM "host" host,
+            showM "description" description,
+            showL "tags" tags,
+            showM "ttl" ttl,
+            showMap "attributes" attributes
+            ]
+          showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
+          showMap name l = let mp = s ^. l 
+                           in if M.null mp then Nothing 
+                              else Just $ (\x -> name ++ " = " ++ show x) $ mp
+          showL name l = let lst = s ^. l 
+                         in if null lst then Nothing 
+                            else Just $ name ++ " = " ++ show lst
         
 instance Default Event where
   def = Event {
@@ -295,6 +332,13 @@ instance Monoid Query where
   mempty = def
   mappend = defMappend
 
+instance Show Query where
+  show s = "Query { " ++ intercalate " ," innards ++ " }"  
+    where innards = catMaybes [
+            showM "query" query
+            ]
+          showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
+
 -- $msg
 
 data MsgState = Ok | Error Text | Unknown
@@ -321,6 +365,22 @@ states = msgStates . field
 
 events :: Lens' Msg [Event]
 events = msgEvents . field
+
+instance Show Msg where
+  show s = "State { " ++ intercalate " ," innards ++ " }"  
+    where innards = catMaybes [
+            showMsgState,
+            showL "states" states,
+            showL "events" events,
+            showM "query" query
+            ]
+          showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
+          showL name l = let lst = s ^. l 
+                         in if null lst then Nothing else Just $ name ++ " = " ++ show lst
+          showMsgState = Just . ("msgState = " ++) $ case s ^. msgState of
+            Ok -> "Ok"
+            Error err -> "Error " ++ show err
+            Unknown -> "Unknown"
 
 instance HasQuery Msg where
   query = msgQuery . field
