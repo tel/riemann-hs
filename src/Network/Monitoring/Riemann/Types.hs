@@ -99,51 +99,51 @@ defMappend x y = G.to $ G.from x `gmappend` G.from y
 -- | 'State' is an object within Riemann's index, a result from a
 -- 'Query'.
 data State = State {
-  _stateTime        :: Optional' D1 (Signed Int64),
-  _stateState       :: Optional' D2 Text,
-  _stateService     :: Optional' D3 Text,
-  _stateHost        :: Optional' D4 Text,
-  _stateDescription :: Optional' D5 Text,
-  _stateOnce        :: Optional' D6 Bool,
-  _stateTags        :: Repeated  D7 Text,
-  _stateTtl         :: Optional' D8 Float
+  _stateTime        :: Optional D1 (Value (Signed Int64)),
+  _stateState       :: Optional D2 (Value Text),
+  _stateService     :: Optional D3 (Value Text),
+  _stateHost        :: Optional D4 (Value Text),
+  _stateDescription :: Optional D5 (Value Text),
+  _stateOnce        :: Optional D6 (Value Bool),
+  _stateTags        :: Repeated D7 (Value Text),
+  _stateTtl         :: Optional D8 (Value Float)
   } deriving (Eq, Show, Generic)
 
 -- | 'Event' is a description of an application-level event, emitted
 -- to Riemann for indexing.
 data Event = Event {
-  _eventTime        :: Optional' D1 (Signed Int64),
-  _eventState       :: Optional' D2 Text,
-  _eventService     :: Optional' D3 Text,
-  _eventHost        :: Optional' D4 Text,
-  _eventDescription :: Optional' D5 Text,
-  _eventTags        :: Repeated  D7 Text,
-  _eventTtl         :: Optional' D8 Float,
+  _eventTime        :: Optional D1 (Value (Signed Int64)),
+  _eventState       :: Optional D2 (Value Text),
+  _eventService     :: Optional D3 (Value Text),
+  _eventHost        :: Optional D4 (Value Text),
+  _eventDescription :: Optional D5 (Value Text),
+  _eventTags        :: Repeated D7 (Value Text),
+  _eventTtl         :: Optional D8 (Value Float),
   
   _eventAttributes  :: Repeated D9 (Message Attribute),
-  _eventMetricSInt  :: Optional' (D1 :* D3) (Signed Int64),
-  _eventMetricD     :: Optional' (D1 :* D4) Double,
-  _eventMetricF     :: Optional' (D1 :* D5) Float
+  _eventMetricSInt  :: Optional (D1 :* D3) (Value (Signed Int64)),
+  _eventMetricD     :: Optional (D1 :* D4) (Value Double),
+  _eventMetricF     :: Optional (D1 :* D5) (Value Float)
   } deriving (Eq, Show, Generic)
 
 -- | 'Query' is a question to be made of the Riemann index.
-data Query = Query { _queryQuery :: Optional' D1 Text }
+data Query = Query { _queryQuery :: Optional D1 (Value Text) }
            deriving (Eq, Show, Generic)
 
 -- | 'Msg' is a wrapper for sending/receiving multiple 'State's,
 -- 'Event's, or a single 'Query'.
 data Msg = Msg {
-  _msgOk     :: Optional' D2 Bool,
-  _msgError  :: Optional' D3 Text,
+  _msgOk     :: Optional D2 (Value Bool),
+  _msgError  :: Optional D3 (Value Text),
   _msgStates :: Repeated D4 (Message State),
-  _msgQuery  :: Optional  D5 (Message Query),
+  _msgQuery  :: Optional D5 (Message Query),
   _msgEvents :: Repeated D6 (Message Event)
   } deriving (Eq, Show, Generic)
 
 -- | 'Attribute' is a key/value pair.
 data Attribute = Attribute {
-  _attributeKey   :: Required' D1 Text,
-  _attributeValue :: Optional' D2 Text
+  _attributeKey   :: Required D1 (Value Text),
+  _attributeValue :: Optional D2 (Value Text)
   } deriving (Eq, Show, Generic)
 
 -- $state
@@ -153,27 +153,27 @@ instance Decode State
 $(makeLenses ''State)
 
 instance HasState State where
-  time        = stateTime . value'
-  state       = stateState . value'
-  service     = stateService . value'
-  host        = stateHost . value'
-  description = stateDescription . value'
-  tags        = stateTags . value'
-  ttl         = stateTtl . value'
+  time        = stateTime . field
+  state       = stateState . field
+  service     = stateService . field
+  host        = stateHost . field
+  description = stateDescription . field
+  tags        = stateTags . field
+  ttl         = stateTtl . field
 
 once :: Lens' State (Maybe Bool)
-once = stateOnce . value'
+once = stateOnce . field
 
 instance Default State where
   def = State {
-    _stateTime        = putValue' Nothing,
-    _stateState       = putValue' Nothing,
-    _stateService     = putValue' Nothing,
-    _stateHost        = putValue' Nothing,
-    _stateDescription = putValue' Nothing,
-    _stateTags        = putValue [],
-    _stateTtl         = putValue' Nothing,
-    _stateOnce        = putValue' Nothing
+    _stateTime        = putField Nothing,
+    _stateState       = putField Nothing,
+    _stateService     = putField Nothing,
+    _stateHost        = putField Nothing,
+    _stateDescription = putField Nothing,
+    _stateTags        = putField [],
+    _stateTtl         = putField Nothing,
+    _stateOnce        = putField Nothing
     }
 
 instance Monoid State where
@@ -187,14 +187,14 @@ instance Decode Attribute
 $(makeLenses ''Attribute)
 
 akey :: Lens' Attribute Text
-akey = attributeKey . value'
+akey = attributeKey . field
 
 aval :: Lens' Attribute (Maybe Text)
-aval = attributeValue . value'
+aval = attributeValue . field
 
 apair :: Iso' Attribute (Text, Maybe Text)
 apair = iso (view akey &&& view aval)
-            (\(k, v) -> Attribute (putValue' k) (putValue' v))
+            (\(k, v) -> Attribute (putField k) (putField v))
 
 -- $event
 
@@ -203,13 +203,13 @@ instance Decode Event
 $(makeLenses ''Event)
 
 instance HasState Event where
-  time        = eventTime . value'
-  state       = eventState . value'
-  service     = eventService . value'
-  host        = eventHost . value'
-  description = eventDescription . value'
-  tags        = eventTags . value'
-  ttl         = eventTtl . value'
+  time        = eventTime . field
+  state       = eventState . field
+  service     = eventService . field
+  host        = eventHost . field
+  description = eventDescription . field
+  tags        = eventTags . field
+  ttl         = eventTtl . field
 
 -- | The class of types which can be interpreted as metrics for an
 -- 'Event'.
@@ -217,19 +217,18 @@ class AMetric a where
   metric :: Lens' Event (Maybe a)
 
 instance AMetric Int where 
-  metric = eventMetricSInt . value' . mapping (iso fromIntegral fromIntegral)
+  metric = eventMetricSInt . field . mapping (iso fromIntegral fromIntegral)
 instance AMetric Integer where 
-  metric = eventMetricSInt . value' . mapping (iso fromIntegral fromIntegral)
+  metric = eventMetricSInt . field . mapping (iso fromIntegral fromIntegral)
 instance AMetric (Signed Int64) where 
-  metric = eventMetricSInt . value'
+  metric = eventMetricSInt . field
 
-instance AMetric Double where metric = eventMetricD    . value'
-instance AMetric Float  where metric = eventMetricF    . value'
+instance AMetric Double where metric = eventMetricD    . field
+instance AMetric Float  where metric = eventMetricF    . field
 
 attributes :: Lens' Event (Map Text Text)
 attributes = eventAttributes
-             . value'
-             . iso (mapMaybe runMessage) (map $ Message . Just)
+             . field
              . mapping apair
              -- This isn't really an iso, it throws away `(_, Nothing)`s
              -- but I'm okay with that since these just represent
@@ -241,17 +240,17 @@ attributes = eventAttributes
         
 instance Default Event where
   def = Event {
-    _eventTime        = putValue' Nothing,
-    _eventState       = putValue' Nothing,
-    _eventService     = putValue' Nothing,
-    _eventHost        = putValue' Nothing,
-    _eventDescription = putValue' Nothing,
-    _eventTags        = putValue [],
-    _eventTtl         = putValue' Nothing,
-    _eventAttributes  = putValue' [],
-    _eventMetricSInt  = putValue' Nothing,
-    _eventMetricD     = putValue' Nothing,
-    _eventMetricF     = putValue' Nothing
+    _eventTime        = putField Nothing,
+    _eventState       = putField Nothing,
+    _eventService     = putField Nothing,
+    _eventHost        = putField Nothing,
+    _eventDescription = putField Nothing,
+    _eventTags        = putField [],
+    _eventTtl         = putField Nothing,
+    _eventAttributes  = putField [],
+    _eventMetricSInt  = putField Nothing,
+    _eventMetricD     = putField Nothing,
+    _eventMetricF     = putField Nothing
     }
 
 instance Monoid Event where
@@ -287,10 +286,10 @@ instance Decode Query
 $(makeLenses ''Query)
 
 instance HasQuery Query where
-  query = queryQuery . value'
+  query = queryQuery . field
 
 instance Default Query where
-  def = Query { _queryQuery = putValue' Nothing }
+  def = Query { _queryQuery = putField Nothing }
 
 instance Monoid Query where
   mempty = def
@@ -306,7 +305,7 @@ $(makeLenses ''Msg)
 
 msgState :: Lens' Msg MsgState
 msgState = iso dup fst
-           . alongside (msgOk . value') (msgError . value')
+           . alongside (msgOk . field) (msgError . field)
            . iso toMsgState fromMsgState
   where dup x = (x, x)
         toMsgState (_,          Just err) = Error err
@@ -318,26 +317,23 @@ msgState = iso dup fst
         fromMsgState Unknown = (Nothing, Nothing)
 
 states :: Lens' Msg [State]
-states = msgStates . value'
-         . iso (mapMaybe runMessage) (map $ Message . Just)
+states = msgStates . field
 
 events :: Lens' Msg [Event]
-events = msgEvents . value'
-         . iso (mapMaybe runMessage) (map $ Message . Just)
+events = msgEvents . field
 
 instance HasQuery Msg where
-  query = msgQuery
-          . message
-          . mapping (iso (getValue' . _queryQuery) (Query . putValue'))
+  query = msgQuery . field
+          . mapping (iso (getField . _queryQuery) (Query . putField))
           . iso join return
 
 instance Default Msg where
   def = Msg {
-    _msgOk = putValue' Nothing,
-    _msgError = putValue' Nothing,
-    _msgStates = putValue' [],
-    _msgQuery = putMessage Nothing,
-    _msgEvents = putValue' []
+    _msgOk = putField Nothing,
+    _msgError = putField Nothing,
+    _msgStates = putField [],
+    _msgQuery = putField Nothing,
+    _msgEvents = putField []
     }
 
 instance Monoid Msg where
