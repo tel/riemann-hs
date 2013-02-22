@@ -265,12 +265,15 @@ instance Show Event where
             showM "description" description,
             showL "tags" tags,
             showM "ttl" ttl,
-            showMap "attributes" attributes
+            showMap "attributes" attributes,
+            showM "metric_sint" (metric :: Lens' Event (Maybe Int)),
+            showM "metric_f" (metric :: Lens' Event (Maybe Float)),
+            showM "metric_d" (metric :: Lens' Event (Maybe Double))
             ]
           showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
           showMap name l = let mp = s ^. l 
                            in if M.null mp then Nothing 
-                              else Just $ (\x -> name ++ " = " ++ show x) $ mp
+                              else Just . (\x -> name ++ " = " ++ show x) $ mp
           showL name l = let lst = s ^. l 
                          in if null lst then Nothing 
                             else Just $ name ++ " = " ++ show lst
