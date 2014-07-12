@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -18,10 +19,9 @@ module Network.Monitoring.Riemann.Types (
 
 import Data.ProtocolBuffers
 
-import GHC.Generics hiding (D1, to, from)
+import GHC.Generics hiding (to, from)
 import qualified GHC.Generics as G
 
-import Data.TypeLevel.Num
 import Data.Int
 import Data.Monoid
 import Data.Maybe
@@ -100,51 +100,51 @@ defMappend x y = G.to $ G.from x `gmappend` G.from y
 -- | 'State' is an object within Riemann's index, a result from a
 -- 'Query'.
 data State = State {
-  _stateTime        :: Optional D1 (Value (Signed Int64)),
-  _stateState       :: Optional D2 (Value Text),
-  _stateService     :: Optional D3 (Value Text),
-  _stateHost        :: Optional D4 (Value Text),
-  _stateDescription :: Optional D5 (Value Text),
-  _stateOnce        :: Optional D6 (Value Bool),
-  _stateTags        :: Repeated D7 (Value Text),
-  _stateTtl         :: Optional D8 (Value Float)
+  _stateTime        :: Optional 1 (Value (Signed Int64)),
+  _stateState       :: Optional 2 (Value Text),
+  _stateService     :: Optional 3 (Value Text),
+  _stateHost        :: Optional 4 (Value Text),
+  _stateDescription :: Optional 5 (Value Text),
+  _stateOnce        :: Optional 6 (Value Bool),
+  _stateTags        :: Repeated 7 (Value Text),
+  _stateTtl         :: Optional 8 (Value Float)
   } deriving (Eq, Generic)
 
 -- | 'Event' is a description of an application-level event, emitted
 -- to Riemann for indexing.
 data Event = Event {
-  _eventTime        :: Optional D1 (Value (Signed Int64)),
-  _eventState       :: Optional D2 (Value Text),
-  _eventService     :: Optional D3 (Value Text),
-  _eventHost        :: Optional D4 (Value Text),
-  _eventDescription :: Optional D5 (Value Text),
-  _eventTags        :: Repeated D7 (Value Text),
-  _eventTtl         :: Optional D8 (Value Float),
+  _eventTime        :: Optional 1 (Value (Signed Int64)),
+  _eventState       :: Optional 2 (Value Text),
+  _eventService     :: Optional 3 (Value Text),
+  _eventHost        :: Optional 4 (Value Text),
+  _eventDescription :: Optional 5 (Value Text),
+  _eventTags        :: Repeated 7 (Value Text),
+  _eventTtl         :: Optional 8 (Value Float),
   
-  _eventAttributes  :: Repeated D9 (Message Attribute),
-  _eventMetricSInt  :: Optional (D1 :* D3) (Value (Signed Int64)),
-  _eventMetricD     :: Optional (D1 :* D4) (Value Double),
-  _eventMetricF     :: Optional (D1 :* D5) (Value Float)
+  _eventAttributes  :: Repeated 9 (Message Attribute),
+  _eventMetricSInt  :: Optional 13 (Value (Signed Int64)),
+  _eventMetricD     :: Optional 14 (Value Double),
+  _eventMetricF     :: Optional 15 (Value Float)
   } deriving (Eq, Generic)
 
 -- | 'Query' is a question to be made of the Riemann index.
-data Query = Query { _queryQuery :: Optional D1 (Value Text) }
+data Query = Query { _queryQuery :: Optional 1 (Value Text) }
            deriving (Eq, Generic)
 
 -- | 'Msg' is a wrapper for sending/receiving multiple 'State's,
 -- 'Event's, or a single 'Query'.
 data Msg = Msg {
-  _msgOk     :: Optional D2 (Value Bool),
-  _msgError  :: Optional D3 (Value Text),
-  _msgStates :: Repeated D4 (Message State),
-  _msgQuery  :: Optional D5 (Message Query),
-  _msgEvents :: Repeated D6 (Message Event)
+  _msgOk     :: Optional 2 (Value Bool),
+  _msgError  :: Optional 3 (Value Text),
+  _msgStates :: Repeated 4 (Message State),
+  _msgQuery  :: Optional 5 (Message Query),
+  _msgEvents :: Repeated 6 (Message Event)
   } deriving (Eq, Generic)
 
 -- | 'Attribute' is a key/value pair.
 data Attribute = Attribute {
-  _attributeKey   :: Required D1 (Value Text),
-  _attributeValue :: Optional D2 (Value Text)
+  _attributeKey   :: Required 1 (Value Text),
+  _attributeValue :: Optional 2 (Value Text)
   } deriving (Eq, Show, Generic)
 
 -- $state
