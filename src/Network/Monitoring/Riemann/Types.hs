@@ -25,7 +25,6 @@ import qualified GHC.Generics as G
 import Data.Int
 import Data.Monoid
 import Data.Maybe
-import Data.Time.Clock
 import Data.Default
 import Data.List
 import Data.Text (Text)

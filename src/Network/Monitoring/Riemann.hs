@@ -3,8 +3,9 @@
 module Network.Monitoring.Riemann (
   module Network.Monitoring.Riemann.Types,
   module Data.Int,
-  Client, makeClient
-  {-sendEvent, sendEvent'-}
+  Client,
+  makeClient,
+  sendEvent
   ) where
 
 import Network.Monitoring.Riemann.Types
