@@ -1,7 +1,7 @@
 name:                riemann
-version:             0.0.0.0
+version:             0.0.0.1
 synopsis:            A Riemann client for Haskell
--- description:         
+-- description:
 homepage:            https://github.com/tel/riemann-hs
 license:             MIT
 license-file:        LICENSE
@@ -14,11 +14,11 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:     src
-  exposed-modules: 
+  exposed-modules:
     Network.Monitoring.Riemann
     Network.Monitoring.Riemann.Types
   other-modules:
-  build-depends:       
+  build-depends:
     base              >= 4.5.0,
     network           >= 2.4.0.0,
     text              >= 0.11.2.3,
@@ -37,7 +37,7 @@ test-suite doctest
   ghc-options:     -threaded
   hs-source-dirs:  test
   main-is:         Doctest.hs
-  build-depends: 
+  build-depends:
     base,
     directory,
     doctest,
@@ -49,7 +49,7 @@ test-suite property
   ghc-options:     -threaded
   hs-source-dirs:  test
   main-is:         Property.hs
-  build-depends: 
+  build-depends:
     base,
     QuickCheck >= 2.5.1.0,
     test-framework,
@@ -62,7 +62,7 @@ test-suite unit
   ghc-options:     -threaded
   hs-source-dirs:  test
   main-is:         Unit.hs
-  build-depends: 
+  build-depends:
     base,
     HUnit,
     test-framework,
