@@ -17,6 +17,7 @@ let
                                    pathBaseName == "LICENSE"       ||
                                    pathBaseName == "Setup.hs"      ||
                                    isWithin path ./src             ||
+                                   isWithin path ./test            ||
                                    false
                                )
                             );
