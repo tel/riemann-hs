@@ -5,6 +5,7 @@ module Network.Monitoring.Riemann (
   module Data.Int,
   Client,
   makeClient,
+  closeClient,
   sendEvent',
   sendEvent
   ) where
@@ -110,7 +111,7 @@ riemann $ ev "<service>" <metric> & tags <>~ "foo"
 
 -}
 
-data Client = UDP (Either SomeException (Socket, AddrInfo))
+data Client = UDP { unClient :: Either SomeException (Socket, AddrInfo) }
             deriving (Show)
 
 type Hostname = String
@@ -135,6 +136,9 @@ makeClient hn po = UDP <$> sock
                                    Datagram
                                    defaultProtocol -- (addrProtocol addy)
                        return (s, addy)
+
+closeClient :: Client -> IO ()
+closeClient c = either (const $ return ()) (close . fst) $ unClient c
 
 -- | Attempts to forward an event to a client. Fails silently.
 sendEvent :: MonadIO m => Client -> Event -> m ()
