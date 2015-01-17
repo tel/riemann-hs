@@ -5,6 +5,7 @@ module Network.Monitoring.Riemann (
   module Data.Int,
   Client,
   makeClient,
+  sendEvent',
   sendEvent
   ) where
 
@@ -109,8 +110,8 @@ riemann $ ev "<service>" <metric> & tags <>~ "foo"
 
 -}
 
-data Client = UDP (Maybe (Socket, AddrInfo))
-            deriving (Show, Eq)
+data Client = UDP (Either SomeException (Socket, AddrInfo))
+            deriving (Show)
 
 type Hostname = String
 type Port     = Int
@@ -119,7 +120,7 @@ type Port     = Int
 -- 'Port'. Failures are silently ignored---failure in monitoring
 -- should not cause an application failure...
 makeClient :: Hostname -> Port -> IO Client
-makeClient hn po = UDP . rightMay <$> sock
+makeClient hn po = UDP <$> sock
   where sock :: IO (Either SomeException (Socket, AddrInfo))
         sock =
           try $ do addrs <- getAddrInfo
@@ -132,7 +133,7 @@ makeClient hn po = UDP . rightMay <$> sock
                      (addy:_) -> do
                        s <- socket (addrFamily addy)
                                    Datagram
-                                   (addrProtocol addy)
+                                   defaultProtocol -- (addrProtocol addy)
                        return (s, addy)
 
 -- | Attempts to forward an event to a client. Fails silently.
@@ -142,8 +143,9 @@ sendEvent c = liftIO . void . runEitherT . sendEvent' c
 -- | Attempts to forward an event to a client. If it fails, it'll
 -- return an 'IOException' in the 'Either'.
 sendEvent' :: Client -> Event -> EitherT IOException IO ()
-sendEvent' (UDP Nothing)  _ = return ()
-sendEvent' (UDP (Just (s, addy))) e = tryIO $ do
+sendEvent' (UDP (Left e))  _ = liftIO (print e) >> return ()
+sendEvent' (UDP (Right (s, addy))) e = tryIO $ do
   now <- fmap round getPOSIXTime
   let msg = def & events .~ [e & time ?~ now]
   void $ sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
+
