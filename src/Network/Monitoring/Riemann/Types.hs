@@ -44,7 +44,7 @@ import Control.Applicative
 -- 'time'. These shared types give rise to restrictedly polymorphic
 -- lenses.
 class HasState a where
-  time        :: Lens' a (Maybe (Signed Int64))
+  time        :: Lens' a (Maybe Int64)
   -- ^ The time of the event, in unix epoch seconds
   state       :: Lens' a (Maybe Text)
   -- ^ Any string less than 255 bytes, e.g. "ok", "warning",
@@ -99,7 +99,7 @@ defMappend x y = G.to $ G.from x `gmappend` G.from y
 -- | 'State' is an object within Riemann's index, a result from a
 -- 'Query'.
 data State = State {
-  _stateTime        :: Optional 1 (Value (Signed Int64)),
+  _stateTime        :: Optional 1 (Value Int64),
   _stateState       :: Optional 2 (Value Text),
   _stateService     :: Optional 3 (Value Text),
   _stateHost        :: Optional 4 (Value Text),
@@ -112,7 +112,7 @@ data State = State {
 -- | 'Event' is a description of an application-level event, emitted
 -- to Riemann for indexing.
 data Event = Event {
-  _eventTime        :: Optional 1 (Value (Signed Int64)),
+  _eventTime        :: Optional 1 (Value Int64),
   _eventState       :: Optional 2 (Value Text),
   _eventService     :: Optional 3 (Value Text),
   _eventHost        :: Optional 4 (Value Text),
