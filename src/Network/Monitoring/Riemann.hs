@@ -128,10 +128,19 @@ makeClient hn po = UDP . rightMay <$> sock
                             (Just $ show po)
                    case addrs of
                      []       -> fail "No accessible addresses"
+
+
+-- This makes no sense. You've pulled the head off, but this could be
+-- resolving to TCP, UDP or whatever. As an example:
+
+-- map addrProtocol <$> getAddrInfo (Just $ defaultHints{addrFlags= [AI_NUMERICSERV]}) (Just "slashdot.org") (Just "5555")
+-- > [6,17,0]
+-- 6 is of course TCP, causing this to fail.
                      (addy:_) -> do
                        s <- socket (addrFamily addy)
                                    Datagram
                                    (addrProtocol addy)
+                                   
                        return (s, addy)
 
 -- | Attempts to forward an event to a client. Fails silently.
