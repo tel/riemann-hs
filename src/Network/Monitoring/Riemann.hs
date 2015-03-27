@@ -3,27 +3,28 @@
 module Network.Monitoring.Riemann (
   module Network.Monitoring.Riemann.Types,
   module Data.Int,
-  Client, makeClient
-  {-sendEvent, sendEvent'-}
+  Client, makeClient,
+  sendEvent, sendEvent'
   ) where
 
-import Network.Monitoring.Riemann.Types
+import           Network.Monitoring.Riemann.Types
 
-import Data.Int
-import Data.Default
-import Data.Time.Clock.POSIX
-import Data.ProtocolBuffers
-import Data.Serialize.Put
+import           Data.Default
+import           Data.Int
+import           Data.ProtocolBuffers
+import           Data.Serialize.Put
+import           Data.Time.Clock.POSIX
 
-import Control.Applicative
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Error
-import Control.Lens
-import Control.Exception
+import           Control.Applicative
+import           Control.Error
+import           Control.Exception
+import           Control.Lens
+import           Control.Monad
+import           Control.Monad.IO.Class
 
-import Network.Socket hiding (send, sendTo, recv, recvFrom)
-import Network.Socket.ByteString
+import           Network.Socket                   hiding (recv, recvFrom, send,
+                                                   sendTo)
+import           Network.Socket.ByteString
 
 {-%
 
@@ -126,12 +127,18 @@ makeClient hn po = UDP . rightMay <$> sock
                                 addrFlags = [AI_NUMERICSERV] })
                             (Just hn)
                             (Just $ show po)
+                   putStrLn (show addrs)
                    case addrs of
                      []       -> fail "No accessible addresses"
                      (addy:_) -> do
-                       s <- socket (addrFamily addy)
-                                   Datagram
-                                   (addrProtocol addy)
+                       putStrLn "creating socket"
+
+                       s <- socket AF_INET
+                            Stream
+                            defaultProtocol
+                       putStrLn (show s)
+                       connect s (addrAddress addy)
+                       putStrLn (show s)
                        return (s, addy)
 
 -- | Attempts to forward an event to a client. Fails silently.
@@ -142,7 +149,11 @@ sendEvent c = liftIO . void . runEitherT . sendEvent' c
 -- return an 'IOException' in the 'Either'.
 sendEvent' :: Client -> Event -> EitherT IOException IO ()
 sendEvent' (UDP Nothing)  _ = return ()
-sendEvent' (UDP (Just (s, addy))) e = tryIO $ do
+sendEvent' (UDP (Just (s, _))) e = tryIO $ do
   now <- fmap round getPOSIXTime
   let msg = def & events .~ [e & time ?~ now]
-  void $ sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
+  putStrLn (show msg)
+  let bytes = runPut $ encodeMessage msg
+  putStrLn (show bytes)
+  l <- send s bytes
+  putStrLn $ "sent " ++ (show l ) ++ "bytes"
