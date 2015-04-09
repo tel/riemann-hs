@@ -3,8 +3,11 @@
 module Network.Monitoring.Riemann (
   module Network.Monitoring.Riemann.Types,
   module Data.Int,
-  Client, makeClient,
-  sendEvent, sendEvent'
+  Client,
+  makeClient,
+  closeClient,
+  sendEvent',
+  sendEvent
   ) where
 
 import           Network.Monitoring.Riemann.Types
@@ -109,8 +112,8 @@ riemann $ ev "<service>" <metric> & tags <>~ "foo"
 
 -}
 
-data Client = UDP (Maybe (Socket, AddrInfo))
-            deriving (Show, Eq)
+data Client = UDP { unClient :: Either SomeException (Socket, AddrInfo) }
+            deriving (Show)
 
 type Hostname = String
 type Port     = Int
@@ -119,7 +122,7 @@ type Port     = Int
 -- 'Port'. Failures are silently ignored---failure in monitoring
 -- should not cause an application failure...
 makeClient :: Hostname -> Port -> IO Client
-makeClient hn po = UDP . rightMay <$> sock
+makeClient hn po = UDP <$> sock
   where sock :: IO (Either SomeException (Socket, AddrInfo))
         sock =
           try $ do addrs <- getAddrInfo
@@ -131,15 +134,14 @@ makeClient hn po = UDP . rightMay <$> sock
                    case addrs of
                      []       -> fail "No accessible addresses"
                      (addy:_) -> do
-                       putStrLn "creating socket"
-
                        s <- socket AF_INET
-                            Stream
+                            Datagram
                             defaultProtocol
                        putStrLn (show s)
-                       connect s (addrAddress addy)
-                       putStrLn (show s)
                        return (s, addy)
+
+closeClient :: Client -> IO ()
+closeClient c = either (const $ return ()) (close . fst) $ unClient c
 
 -- | Attempts to forward an event to a client. Fails silently.
 sendEvent :: MonadIO m => Client -> Event -> m ()
@@ -148,12 +150,9 @@ sendEvent c = liftIO . void . runEitherT . sendEvent' c
 -- | Attempts to forward an event to a client. If it fails, it'll
 -- return an 'IOException' in the 'Either'.
 sendEvent' :: Client -> Event -> EitherT IOException IO ()
-sendEvent' (UDP Nothing)  _ = return ()
-sendEvent' (UDP (Just (s, _))) e = tryIO $ do
+sendEvent' (UDP (Left e))  _ = liftIO (print e) >> return ()
+sendEvent' (UDP (Right (s, addy))) e = tryIO $ do
   now <- fmap round getPOSIXTime
   let msg = def & events .~ [e & time ?~ now]
-  putStrLn (show msg)
-  let bytes = runPut $ encodeMessage msg
-  putStrLn (show bytes)
-  l <- send s bytes
+  l <-  sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
   putStrLn $ "sent " ++ (show l ) ++ "bytes"

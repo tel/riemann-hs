@@ -25,7 +25,6 @@ import qualified GHC.Generics as G
 import Data.Int
 import Data.Monoid
 import Data.Maybe
-import Data.Time.Clock
 import Data.Default
 import Data.List
 import Data.Text (Text)
@@ -45,7 +44,7 @@ import Control.Applicative
 -- 'time'. These shared types give rise to restrictedly polymorphic
 -- lenses.
 class HasState a where
-  time        :: Lens' a (Maybe (Signed Int64))
+  time        :: Lens' a (Maybe Int64)
   -- ^ The time of the event, in unix epoch seconds
   state       :: Lens' a (Maybe Text)
   -- ^ Any string less than 255 bytes, e.g. "ok", "warning",
@@ -100,7 +99,7 @@ defMappend x y = G.to $ G.from x `gmappend` G.from y
 -- | 'State' is an object within Riemann's index, a result from a
 -- 'Query'.
 data State = State {
-  _stateTime        :: Optional 1 (Value (Signed Int64)),
+  _stateTime        :: Optional 1 (Value Int64),
   _stateState       :: Optional 2 (Value Text),
   _stateService     :: Optional 3 (Value Text),
   _stateHost        :: Optional 4 (Value Text),
@@ -113,14 +112,14 @@ data State = State {
 -- | 'Event' is a description of an application-level event, emitted
 -- to Riemann for indexing.
 data Event = Event {
-  _eventTime        :: Optional 1 (Value (Signed Int64)),
+  _eventTime        :: Optional 1 (Value Int64),
   _eventState       :: Optional 2 (Value Text),
   _eventService     :: Optional 3 (Value Text),
   _eventHost        :: Optional 4 (Value Text),
   _eventDescription :: Optional 5 (Value Text),
   _eventTags        :: Repeated 7 (Value Text),
   _eventTtl         :: Optional 8 (Value Float),
-  
+
   _eventAttributes  :: Repeated 9 (Message Attribute),
   _eventMetricSInt  :: Optional 13 (Value (Signed Int64)),
   _eventMetricD     :: Optional 14 (Value Double),
@@ -166,7 +165,7 @@ once :: Lens' State (Maybe Bool)
 once = stateOnce . field
 
 instance Show State where
-  show s = "State { " ++ intercalate ", " innards ++ " }"  
+  show s = "State { " ++ intercalate ", " innards ++ " }"
     where innards = catMaybes [
             showM "time" time,
             showM "state" state,
@@ -178,7 +177,7 @@ instance Show State where
             showM "once" once
             ]
           showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
-          showL name l = let lst = s ^. l 
+          showL name l = let lst = s ^. l
                          in if null lst then Nothing else Just $ name ++ " = " ++ show lst
 
 instance Default State where
@@ -233,11 +232,11 @@ instance HasState Event where
 class AMetric a where
   metric :: Lens' Event (Maybe a)
 
-instance AMetric Int where 
+instance AMetric Int where
   metric = eventMetricSInt . field . mapping (iso fromIntegral fromIntegral)
-instance AMetric Integer where 
+instance AMetric Integer where
   metric = eventMetricSInt . field . mapping (iso fromIntegral fromIntegral)
-instance AMetric (Signed Int64) where 
+instance AMetric (Signed Int64) where
   metric = eventMetricSInt . field
 
 instance AMetric Double where metric = eventMetricD    . field
@@ -256,7 +255,7 @@ attributes = eventAttributes
         sequen (a, fb) = (a,) <$> fb
 
 instance Show Event where
-  show s = "Event { " ++ intercalate ", " innards ++ " }"  
+  show s = "Event { " ++ intercalate ", " innards ++ " }"
     where innards = catMaybes [
             showM "time" time,
             showM "state" state,
@@ -271,13 +270,13 @@ instance Show Event where
             showM "metric_d" (metric :: Lens' Event (Maybe Double))
             ]
           showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
-          showMap name l = let mp = s ^. l 
-                           in if M.null mp then Nothing 
+          showMap name l = let mp = s ^. l
+                           in if M.null mp then Nothing
                               else Just . (\x -> name ++ " = " ++ show x) $ mp
-          showL name l = let lst = s ^. l 
-                         in if null lst then Nothing 
+          showL name l = let lst = s ^. l
+                         in if null lst then Nothing
                             else Just $ name ++ " = " ++ show lst
-        
+
 instance Default Event where
   def = Event {
     _eventTime        = putField Nothing,
@@ -301,22 +300,22 @@ instance Monoid Event where
 
 -- | Create a simple 'Event' with state "ok".
 --
--- >>> get state $ ev "service" (0 :: (Signed Int64))
+-- >>> view state $ ev "service" (0 :: (Signed Int64))
 -- Just "ok"
 --
--- >>> get service $ ev "service" (0 :: (Signed Int64))
+-- >>> view service $ ev "service" (0 :: (Signed Int64))
 -- Just "service"
 --
--- >>> get metric $ ev "service" (0 :: (Signed Int64)) :: Maybe (Signed Int64)
--- Just 0
+-- >>> view metric $ ev "service" (0 :: (Signed Int64)) :: Maybe (Signed Int64)
+-- Just (Signed 0)
 --
--- >>> get tags $ ev "service" (0 :: (Signed Int64))
+-- >>> view tags $ ev "service" (0 :: (Signed Int64))
 -- []
 ev :: AMetric a => String -> a -> Event
 ev serv met =
-  def 
-  & state ?~ "ok" 
-  & service ?~ T.pack serv 
+  def
+  & state ?~ "ok"
+  & service ?~ T.pack serv
   & metric ?~ met
 
 -- $query
@@ -336,7 +335,7 @@ instance Monoid Query where
   mappend = defMappend
 
 instance Show Query where
-  show s = "Query { " ++ intercalate ", " innards ++ " }"  
+  show s = "Query { " ++ intercalate ", " innards ++ " }"
     where innards = catMaybes [
             showM "query" query
             ]
@@ -370,7 +369,7 @@ events :: Lens' Msg [Event]
 events = msgEvents . field
 
 instance Show Msg where
-  show s = "Msg { " ++ intercalate ", " innards ++ " }"  
+  show s = "Msg { " ++ intercalate ", " innards ++ " }"
     where innards = catMaybes [
             showMsgState,
             showL "states" states,
@@ -378,7 +377,7 @@ instance Show Msg where
             showM "query" query
             ]
           showM name l = (\x -> name ++ " = " ++ x) . show <$> s ^. l
-          showL name l = let lst = s ^. l 
+          showL name l = let lst = s ^. l
                          in if null lst then Nothing else Just $ name ++ " = " ++ show lst
           showMsgState = ("msgState = " ++) <$> case s ^. msgState of
             Ok -> Just "Ok"
