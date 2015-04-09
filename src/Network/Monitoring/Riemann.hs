@@ -1,10 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Network.Monitoring.Riemann (
   module Network.Monitoring.Riemann.Types,
   module Data.Int,
   Client,
-  makeClient,
+  makeUDPClient,
+  makeTCPClient,
   closeClient,
   sendEvent',
   sendEvent
@@ -12,6 +14,7 @@ module Network.Monitoring.Riemann (
 
 import           Network.Monitoring.Riemann.Types
 
+import qualified Data.ByteString                  as BS
 import           Data.Default
 import           Data.Int
 import           Data.ProtocolBuffers
@@ -113,6 +116,7 @@ riemann $ ev "<service>" <metric> & tags <>~ "foo"
 -}
 
 data Client = UDP { unClient :: Either SomeException (Socket, AddrInfo) }
+            | TCP { unClient :: Either SomeException (Socket, AddrInfo) }
             deriving (Show)
 
 type Hostname = String
@@ -121,8 +125,8 @@ type Port     = Int
 -- | Attempts to bind a UDP client at the passed 'Hostname' and
 -- 'Port'. Failures are silently ignored---failure in monitoring
 -- should not cause an application failure...
-makeClient :: Hostname -> Port -> IO Client
-makeClient hn po = UDP <$> sock
+makeUDPClient :: Hostname -> Port -> IO Client
+makeUDPClient hn po = UDP <$> sock
   where sock :: IO (Either SomeException (Socket, AddrInfo))
         sock =
           try $ do addrs <- getAddrInfo
@@ -140,6 +144,29 @@ makeClient hn po = UDP <$> sock
                        putStrLn (show s)
                        return (s, addy)
 
+makeTCPClient :: Hostname -> Port -> IO Client
+makeTCPClient hn po =  TCP <$> sock
+  where tcpv4 addr = addrSocketType addr == Stream  &&
+                     addrFamily addr == AF_INET
+        sock :: IO (Either SomeException (Socket, AddrInfo))
+        sock =
+          try $ do addrs <- getAddrInfo
+                            (Just $ defaultHints {
+                                addrFlags = [AI_NUMERICSERV] })
+                            (Just hn)
+                            (Just $ show po)
+                   putStrLn (show addrs)
+                   case (filter tcpv4 addrs) of
+                     []       -> fail "No accessible addresses"
+                     (addy:_) -> do
+                       s <- socket AF_INET
+                            Stream
+                            defaultProtocol
+                       putStrLn (show s)
+                       connect s (addrAddress addy)
+                       return (s, addy)
+
+
 closeClient :: Client -> IO ()
 closeClient c = either (const $ return ()) (close . fst) $ unClient c
 
@@ -155,4 +182,13 @@ sendEvent' (UDP (Right (s, addy))) e = tryIO $ do
   now <- fmap round getPOSIXTime
   let msg = def & events .~ [e & time ?~ now]
   l <-  sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
+  putStrLn $ "sent " ++ (show l ) ++ "bytes"
+sendEvent' (TCP (Left e))  _ = liftIO (print e) >> return ()
+sendEvent' (TCP (Right (s, _))) e = tryIO $ do
+  now <- fmap round getPOSIXTime
+  let msg = def & events .~ [e & time ?~ now]
+  let bytes = runPut $ encodeMessage msg
+  let len = runPut $ putWord32be (fromIntegral $ BS.length bytes)
+  _ <-  send s len
+  l <-  send s bytes
   putStrLn $ "sent " ++ (show l ) ++ "bytes"
