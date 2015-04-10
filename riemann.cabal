@@ -44,6 +44,8 @@ executable riemann-client
                 text              >= 0.11.2.3,
                 containers        >= 0.4.2.0,
                 protobuf          >= 0.2,
+                wreq,
+                http-client, 
                 bytestring,
                 lens,
                 time,
