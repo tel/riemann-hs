@@ -115,8 +115,14 @@ riemann $ ev "<service>" <metric> & tags <>~ "foo"
 
 -}
 
-data Client = UDP { unClient :: Either SomeException (Socket, AddrInfo) }
-            | TCP { unClient :: Either SomeException (Socket, AddrInfo) }
+data Client = UDP { riemannHost :: Hostname
+                  , riemannPort :: Port
+                  , unClient    :: Either IOException (Socket, AddrInfo)
+                  }
+            | TCP { riemannHost :: Hostname
+                  , riemannPort :: Port
+                  , unClient    :: Either IOException (Socket, AddrInfo)
+                  }
             deriving (Show)
 
 type Hostname = String
@@ -126,45 +132,44 @@ type Port     = Int
 -- 'Port'. Failures are silently ignored---failure in monitoring
 -- should not cause an application failure...
 makeUDPClient :: Hostname -> Port -> IO Client
-makeUDPClient hn po = UDP <$> sock
-  where sock :: IO (Either SomeException (Socket, AddrInfo))
+makeUDPClient hn po = UDP hn po <$> sock
+  where sock :: IO (Either IOException (Socket, AddrInfo))
         sock =
           try $ do addrs <- getAddrInfo
                             (Just $ defaultHints {
                                 addrFlags = [AI_NUMERICSERV] })
                             (Just hn)
                             (Just $ show po)
-                   putStrLn (show addrs)
                    case addrs of
                      []       -> fail "No accessible addresses"
                      (addy:_) -> do
                        s <- socket AF_INET
                             Datagram
                             defaultProtocol
-                       putStrLn (show s)
                        return (s, addy)
 
 makeTCPClient :: Hostname -> Port -> IO Client
-makeTCPClient hn po =  TCP <$> sock
-  where tcpv4 addr = addrSocketType addr == Stream  &&
-                     addrFamily addr == AF_INET
-        sock :: IO (Either SomeException (Socket, AddrInfo))
-        sock =
-          try $ do addrs <- getAddrInfo
-                            (Just $ defaultHints {
-                                addrFlags = [AI_NUMERICSERV] })
-                            (Just hn)
-                            (Just $ show po)
-                   putStrLn (show addrs)
-                   case (filter tcpv4 addrs) of
-                     []       -> fail "No accessible addresses"
-                     (addy:_) -> do
-                       s <- socket AF_INET
-                            Stream
-                            defaultProtocol
-                       putStrLn (show s)
-                       connect s (addrAddress addy)
-                       return (s, addy)
+makeTCPClient hn po =  TCP hn po <$> tcpConnect hn po
+
+tcpv4 :: AddrInfo -> Bool
+tcpv4 addr = addrSocketType addr == Stream  &&
+             addrFamily addr == AF_INET
+
+tcpConnect :: Hostname -> Port -> IO (Either IOException (Socket, AddrInfo))
+tcpConnect hn po =
+  try $ do addrs <- getAddrInfo
+                    (Just $ defaultHints {
+                        addrFlags = [AI_NUMERICSERV] })
+                    (Just hn)
+                    (Just $ show po)
+           case (filter tcpv4 addrs) of
+            []       -> fail "No accessible addresses"
+            (addy:_) -> do
+              s <- socket AF_INET
+                   Stream
+                   defaultProtocol
+              connect s (addrAddress addy)
+              return (s, addy)
 
 
 closeClient :: Client -> IO ()
@@ -177,18 +182,17 @@ sendEvent c = liftIO . void . runEitherT . sendEvent' c
 -- | Attempts to forward an event to a client. If it fails, it'll
 -- return an 'IOException' in the 'Either'.
 sendEvent' :: Client -> Event -> EitherT IOException IO ()
-sendEvent' (UDP (Left e))  _ = liftIO (print e) >> return ()
-sendEvent' (UDP (Right (s, addy))) e = tryIO $ do
+sendEvent' (UDP _ _  (Left e))  _          = left e
+sendEvent' (UDP _ _   (Right (s, addy))) e = tryIO $ do
   now <- fmap round getPOSIXTime
   let msg = def & events .~ [e & time ?~ now]
   l <-  sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
   putStrLn $ "sent " ++ (show l ) ++ "bytes"
-sendEvent' (TCP (Left e))  _ = liftIO (print e) >> return ()
-sendEvent' (TCP (Right (s, _))) e = tryIO $ do
+sendEvent' (TCP _ _  (Left e))  _    = left e
+sendEvent' (TCP _ _ (Right (s, _))) e = tryIO $ do
   now <- fmap round getPOSIXTime
   let msg = def & events .~ [e & time ?~ now]
   let bytes = runPut $ encodeMessage msg
-  let len = runPut $ putWord32be (fromIntegral $ BS.length bytes)
-  _ <-  send s len
-  l <-  send s bytes
-  putStrLn $ "sent " ++ (show l ) ++ "bytes"
+  let bytesWithLen = runPut (putWord32be (fromIntegral $ BS.length bytes)  >> putByteString bytes)
+  l <-  send s bytesWithLen
+  putStrLn $ "sent " ++ (show l ) ++ " bytes"
