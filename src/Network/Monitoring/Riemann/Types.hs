@@ -1,11 +1,11 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Network.Monitoring.Riemann.Types (
   HasState (..),
@@ -14,28 +14,24 @@ module Network.Monitoring.Riemann.Types (
   State, Event, Query, Msg,
   ev,
   once, attributes,
-  MsgState, msgState, states, events
+  MsgState, msgState, states, events,
+  Hostname, Port
   ) where
 
-import Data.ProtocolBuffers
-
-import GHC.Generics hiding (to, from)
-import qualified GHC.Generics as G
-
-import Data.Int
-import Data.Monoid
-import Data.Maybe
-import Data.Default
-import Data.List
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Map (Map)
-import qualified Data.Map as M
-
-import Control.Lens
-import Control.Monad
-import Control.Arrow
-import Control.Applicative
+import           Control.Arrow
+import           Control.Lens
+import           Control.Monad
+import           Data.Default
+import           Data.Int
+import           Data.List
+import           Data.Map             (Map)
+import qualified Data.Map             as M
+import           Data.Maybe
+import           Data.ProtocolBuffers
+import           Data.Text            (Text)
+import qualified Data.Text            as T
+import           GHC.Generics         hiding (from, to)
+import qualified GHC.Generics         as G
 
 -- $class
 
@@ -401,3 +397,7 @@ instance Default Msg where
 instance Monoid Msg where
   mempty = def
   mappend = defMappend
+
+
+type Hostname = String
+type Port     = Int

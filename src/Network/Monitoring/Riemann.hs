@@ -1,32 +1,31 @@
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Network.Monitoring.Riemann (
   module Network.Monitoring.Riemann.Types,
   module Data.Int,
-  Client,
-  makeUDPClient,
-  makeTCPClient,
+  Client(..), makeUDPClient, makeTCPClient, isError,
   closeClient,
-  sendEvent',
-  sendEvent
-  ) where
+  sendEventT, sendEvent  ) where
 
+import           Network.Monitoring.Riemann.TCP
 import           Network.Monitoring.Riemann.Types
 
-import qualified Data.ByteString                  as BS
 import           Data.Default
 import           Data.Int
+import           Data.IORef                       (IORef, atomicModifyIORef',
+                                                   newIORef, readIORef,
+                                                   writeIORef)
 import           Data.ProtocolBuffers
 import           Data.Serialize.Put
 import           Data.Time.Clock.POSIX
 
-import           Control.Applicative
 import           Control.Error
 import           Control.Exception
 import           Control.Lens
 import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad.Trans
 
 import           Network.Socket                   hiding (recv, recvFrom, send,
                                                    sendTo)
@@ -117,16 +116,21 @@ riemann $ ev "<service>" <metric> & tags <>~ "foo"
 
 data Client = UDP { riemannHost :: Hostname
                   , riemannPort :: Port
-                  , unClient    :: Either IOException (Socket, AddrInfo)
+                  , udpClient   :: Either IOException (Socket, AddrInfo)
                   }
             | TCP { riemannHost :: Hostname
                   , riemannPort :: Port
-                  , unClient    :: Either IOException (Socket, AddrInfo)
+                  , tcpClient   :: IORef TCPState
+                    -- ^ TCP connection's state is maintained into a mutable reference in order to allow
+                    -- not mutating the @Client@ structure
                   }
-            deriving (Show)
 
-type Hostname = String
-type Port     = Int
+-- |Checks whether or not a given @Client@ is in an error state.
+isError :: (MonadIO m) => Client -> m Bool
+isError (UDP _ _ (Left  _))  = return True
+isError (UDP _ _ (Right _ )) = return False
+isError (TCP _ _ r) = isTCPError <$> liftIO (readIORef r)
+
 
 -- | Attempts to bind a UDP client at the passed 'Hostname' and
 -- 'Port'. Failures are silently ignored---failure in monitoring
@@ -148,51 +152,59 @@ makeUDPClient hn po = UDP hn po <$> sock
                             defaultProtocol
                        return (s, addy)
 
+-- | Attempts to connect to given riemann server
+-- Returns an initialised TCP client that can later be used to send events to given riemann host/port.
+-- TCP Clients always try to reconnect to server when an event is sent and connection is either closed
+-- or in error.
 makeTCPClient :: Hostname -> Port -> IO Client
-makeTCPClient hn po =  TCP hn po <$> tcpConnect hn po
-
-tcpv4 :: AddrInfo -> Bool
-tcpv4 addr = addrSocketType addr == Stream  &&
-             addrFamily addr == AF_INET
-
-tcpConnect :: Hostname -> Port -> IO (Either IOException (Socket, AddrInfo))
-tcpConnect hn po =
-  try $ do addrs <- getAddrInfo
-                    (Just $ defaultHints {
-                        addrFlags = [AI_NUMERICSERV] })
-                    (Just hn)
-                    (Just $ show po)
-           case (filter tcpv4 addrs) of
-            []       -> fail "No accessible addresses"
-            (addy:_) -> do
-              s <- socket AF_INET
-                   Stream
-                   defaultProtocol
-              connect s (addrAddress addy)
-              return (s, addy)
+makeTCPClient hn po =  do
+  ref <- newIORef CnxClosed
+  cnx <- tcpConnect hn po CnxClosed
+  writeIORef ref cnx
+  return $ TCP hn po ref
 
 
 closeClient :: Client -> IO ()
-closeClient c = either (const $ return ()) (close . fst) $ unClient c
+closeClient (UDP _ _ cnx) = either (const $ return ()) (close . fst) cnx
+closeClient (TCP _ _ r ) = do
+  tcp <- readIORef r
+  case tcp of
+   CnxOpen (s,_) -> close s
+   _             -> return ()
+  atomicModifyIORef' r (const $ (CnxClosed, ()))
+
 
 -- | Attempts to forward an event to a client. Fails silently.
 sendEvent :: MonadIO m => Client -> Event -> m ()
-sendEvent c = liftIO . void . runEitherT . sendEvent' c
+sendEvent c = liftIO . void . runExceptT . sendEventT c
 
 -- | Attempts to forward an event to a client. If it fails, it'll
--- return an 'IOException' in the 'Either'.
-sendEvent' :: Client -> Event -> EitherT IOException IO ()
-sendEvent' (UDP _ _  (Left e))  _          = left e
-sendEvent' (UDP _ _   (Right (s, addy))) e = tryIO $ do
+-- return an 'IOException' in the 'ExceptT', otherwise it returns the passed @Client@, possibly
+-- modified to cope for changes in state.
+sendEventT :: Client -> Event -> ExceptT IOException IO Client
+sendEventT client@(UDP _ _ _)  event = sendUDPEvent client event
+sendEventT client@(TCP _ _ _ ) event = sendTCPEvent client event
+
+sendTCPEvent :: (MonadIO m) => Client -> Event -> ExceptT IOException m Client
+sendTCPEvent c@(TCP h  n  r) event = tryIO $ do
+  tcp <- readIORef r
+  case tcp of
+   CnxOpen (s,_) -> doSendTCPEvent r s event >> return c
+   s             -> do
+     s' <- tcpConnect h n s
+     writeIORef r s'
+     case s' of
+      CnxOpen (sock,_) ->  doSendTCPEvent r sock event >> return c
+      CnxError e       -> throw e
+      _                -> fail "connection is closed after retry"
+sendTCPEvent _ _  = fail "trying to send TCP event through UDP client"
+
+
+sendUDPEvent :: (MonadIO m) => Client -> Event -> ExceptT IOException m Client
+sendUDPEvent (UDP _ _ (Left e)) _ = throwE e
+sendUDPEvent c@(UDP _ _ (Right (s, addy))) e = tryIO $ do
   now <- fmap round getPOSIXTime
   let msg = def & events .~ [e & time ?~ now]
-  l <-  sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
-  putStrLn $ "sent " ++ (show l ) ++ "bytes"
-sendEvent' (TCP _ _  (Left e))  _    = left e
-sendEvent' (TCP _ _ (Right (s, _))) e = tryIO $ do
-  now <- fmap round getPOSIXTime
-  let msg = def & events .~ [e & time ?~ now]
-  let bytes = runPut $ encodeMessage msg
-  let bytesWithLen = runPut (putWord32be (fromIntegral $ BS.length bytes)  >> putByteString bytes)
-  l <-  send s bytesWithLen
-  putStrLn $ "sent " ++ (show l ) ++ " bytes"
+  void $ sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
+  return c
+sendUDPEvent _ _  = fail "trying to send UDP event through TCP client"
