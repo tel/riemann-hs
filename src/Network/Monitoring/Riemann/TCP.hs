@@ -85,14 +85,16 @@ doSendTCPEvent r s event = do
 doReceiveAck :: IORef TCPState -> Socket -> IO ()
 doReceiveAck r s = do
   bs <- recv s 4096
-  case decoded bs of
-   Left err  -> return () -- TODO something useful, but what ? Close the socket ?
-   Right msg -> do
-     let st = msg ^. msgState
-     case st of
-      Ok      -> return ()
-      Error t -> return () -- TODO something useful
-      Unknown -> return ()
+  if BS.length bs == 0
+    then close s >> writeIORef r CnxClosed
+    else case decoded bs of
+          Left _    -> return () -- TODO something useful, but what ? Close the socket ?
+          Right msg -> do
+            let st = msg ^. msgState
+            case st of
+             Ok      -> return ()
+             Error _ -> return () -- TODO something useful
+             Unknown -> return ()
 
   where
     decoded bs = runGet decodeMessage bs :: Either String Msg
