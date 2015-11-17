@@ -7,6 +7,7 @@ import qualified Data.ByteString                  as BS
 import           Data.Default
 import           Data.IORef                       (IORef, writeIORef)
 import           Data.ProtocolBuffers
+import           Data.Serialize.Get
 import           Data.Serialize.Put
 import           Data.Time.Clock.POSIX
 
@@ -78,4 +79,20 @@ doSendTCPEvent r s event = do
     void $ send s bytesWithLen
   case sending of
    Left e  -> writeIORef r (CnxError e)
-   Right _ -> return ()
+   Right _ -> doReceiveAck r s
+
+-- | Re
+doReceiveAck :: IORef TCPState -> Socket -> IO ()
+doReceiveAck r s = do
+  bs <- recv s 4096
+  case decoded bs of
+   Left err  -> return () -- TODO something useful, but what ? Close the socket ?
+   Right msg -> do
+     let st = msg ^. msgState
+     case st of
+      Ok      -> return ()
+      Error t -> return () -- TODO something useful
+      Unknown -> return ()
+
+  where
+    decoded bs = runGet decodeMessage bs :: Either String Msg
