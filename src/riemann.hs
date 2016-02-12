@@ -3,7 +3,6 @@
 
 module Main where
 
-import           Control.Applicative
 import           Control.Concurrent
 import           Control.Error
 import           Control.Exception          (catch)
@@ -35,7 +34,7 @@ check c uri = do
   ok <- (get uri >> return True) `catch` \ (_ :: HttpException) -> return False
   en <- getCurrentTime
   let event = ev ("http " <> uri) (realToFrac (diffUTCTime en st) :: Double) & state ?~ if ok then "ok" else "error"
-  res <- liftIO $ runEitherT $ sendEvent' c event
+  res <- liftIO $ runExceptT $ sendEventT c event
   -- not very useful error handling, if socket fails to connect at startup it cannot reconnects later
   either
     (\e -> putStrLn ("error connecting to riemann server: " <> show e))

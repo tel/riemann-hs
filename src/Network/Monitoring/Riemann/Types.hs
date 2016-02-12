@@ -14,7 +14,7 @@ module Network.Monitoring.Riemann.Types (
   State, Event, Query, Msg,
   ev,
   once, attributes,
-  MsgState, msgState, states, events,
+  MsgState(..), msgState, states, events,
   Hostname, Port
   ) where
 
