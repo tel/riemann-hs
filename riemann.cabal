@@ -1,7 +1,7 @@
 name:                riemann
 version:             0.1.0.0
 synopsis:            A Riemann client for Haskell
--- description:
+description:         A Riemann client for Haskell
 homepage:            https://github.com/tel/riemann-hs
 license:             MIT
 license-file:        LICENSE
@@ -20,7 +20,7 @@ library
   other-modules:
     Network.Monitoring.Riemann.TCP
   build-depends:       
-                       base              >= 4.5.0,
+                       base              >= 4.5 && < 5
                        network           >= 2.4.0.0,
                        text              >= 0.11.2.3,
                        containers        >= 0.4.2.0,
