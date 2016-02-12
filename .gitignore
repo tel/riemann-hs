@@ -3,3 +3,4 @@ dist/
 dist_*/
 clj
 .hsenv_*
+.stack-work
