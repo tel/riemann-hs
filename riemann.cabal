@@ -18,7 +18,7 @@ library
     Network.Monitoring.Riemann
     Network.Monitoring.Riemann.Types
   other-modules:
-                Network.Monitoring.Riemann.TCP
+    Network.Monitoring.Riemann.TCP
   build-depends:       
                        base              >= 4.5.0,
                        network           >= 2.4.0.0,
