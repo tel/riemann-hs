@@ -1,5 +1,5 @@
 name:                riemann
-version:             0.1.0.0
+version:             0.1.1.0
 synopsis:            A Riemann client for Haskell
 description:         A Riemann client for Haskell
 homepage:            https://github.com/tel/riemann-hs
