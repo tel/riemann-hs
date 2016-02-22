@@ -14,8 +14,7 @@ module Network.Monitoring.Riemann.Types (
   State, Event, Query, Msg,
   ev,
   once, attributes,
-  MsgState(..), msgState, states, events,
-  Hostname, Port
+  MsgState(..), msgState, states, events
   ) where
 
 import           Control.Arrow
@@ -398,6 +397,3 @@ instance Monoid Msg where
   mempty = def
   mappend = defMappend
 
-
-type Hostname = String
-type Port     = Int
