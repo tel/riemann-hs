@@ -1,4 +1,4 @@
-option java_package = "com.aphyr.riemann";
+option java_package = "io.riemann.riemann";
 option java_outer_classname = "Proto";
 
 message State {
@@ -22,6 +22,7 @@ message Event {
   optional float ttl = 8;
   repeated Attribute attributes = 9;
 
+  optional int64 time_micros = 10;
   optional sint64 metric_sint64 = 13;
   optional double metric_d = 14;
   optional float metric_f = 15;
