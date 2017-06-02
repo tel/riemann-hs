@@ -203,8 +203,8 @@ sendTCPEvent _ _  = fail "trying to send TCP event through UDP client"
 sendUDPEvent :: (MonadIO m) => Client -> Event -> ExceptT IOException m Client
 sendUDPEvent (UDP _ _ (Left e)) _ = throwE e
 sendUDPEvent c@(UDP _ _ (Right (s, addy))) e = tryIO $ do
-  now <- fmap round getPOSIXTime
-  let msg = def & events .~ [e & time ?~ now]
+  now <- getPOSIXTime
+  let msg = def & events .~ [e & time ?~ round now & time_micros ?~ round (now * 1e6)]
   void $ sendTo s (runPut $ encodeMessage msg) (addrAddress addy)
   return c
 sendUDPEvent _ _  = fail "trying to send UDP event through TCP client"

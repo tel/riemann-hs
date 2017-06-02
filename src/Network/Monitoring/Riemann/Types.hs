@@ -251,7 +251,9 @@ attributes = eventAttributes
   where sequen :: Applicative f => (a, f b) -> f (a, b)
         sequen (a, fb) = (a,) <$> fb
 
--- | optional precision for the event time
+-- | optional increased precision for the event time
+-- this is the full time value, to uSec precision.
+-- It is NOT the fractional part of the time
 time_micros :: Lens' Event (Maybe Int64)
 time_micros = eventTimeMicros . field
 
