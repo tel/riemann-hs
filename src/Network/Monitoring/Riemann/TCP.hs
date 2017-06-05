@@ -72,8 +72,8 @@ doConnect hn po = do addrs <- getAddrInfo
 doSendTCPEvent :: IORef TCPState -> Socket -> Event -> IO ()
 doSendTCPEvent r s event = do
   sending <- try $ do
-    now <- fmap round getPOSIXTime
-    let msg = def & events .~ [event & time ?~ now]
+    now <- getPOSIXTime
+    let msg = def & events .~ [event & time ?~ round now & time_micros ?~ round (now * 1e6)]
         bytes = runPut $ encodeMessage msg
         bytesWithLen = runPut (putWord32be (fromIntegral $ BS.length bytes)  >> putByteString bytes)
     void $ send s bytesWithLen

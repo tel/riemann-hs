@@ -13,7 +13,7 @@ module Network.Monitoring.Riemann.Types (
   HasQuery (..),
   State, Event, Query, Msg,
   ev,
-  once, attributes,
+  once, attributes, time_micros,
   MsgState(..), msgState, states, events,
   Hostname, Port
   ) where
@@ -117,6 +117,7 @@ data Event = Event {
   _eventTtl         :: Optional 8 (Value Float),
 
   _eventAttributes  :: Repeated 9 (Message Attribute),
+  _eventTimeMicros  :: Optional 10 (Value Int64),
   _eventMetricSInt  :: Optional 13 (Value (Signed Int64)),
   _eventMetricD     :: Optional 14 (Value Double),
   _eventMetricF     :: Optional 15 (Value Float)
@@ -250,10 +251,17 @@ attributes = eventAttributes
   where sequen :: Applicative f => (a, f b) -> f (a, b)
         sequen (a, fb) = (a,) <$> fb
 
+-- | optional increased precision for the event time
+-- this is the full time value, to uSec precision.
+-- It is NOT the fractional part of the time
+time_micros :: Lens' Event (Maybe Int64)
+time_micros = eventTimeMicros . field
+
 instance Show Event where
   show s = "Event { " ++ intercalate ", " innards ++ " }"
     where innards = catMaybes [
             showM "time" time,
+            showM "time_micros" time_micros,
             showM "state" state,
             showM "service" service,
             showM "host" host,
@@ -282,6 +290,7 @@ instance Default Event where
     _eventDescription = putField Nothing,
     _eventTags        = putField [],
     _eventTtl         = putField Nothing,
+    _eventTimeMicros  = putField Nothing,
     _eventAttributes  = putField [],
     _eventMetricSInt  = putField Nothing,
     _eventMetricD     = putField Nothing,
